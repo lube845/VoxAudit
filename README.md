@@ -135,7 +135,3 @@ VoxAudit/
 | `LLM_API_ENDPOINT/LLM_API_KEY/LLM_MODEL` | 大模型 API |
 | `ASR_API_URL` | 语音转写服务地址 |
 | `OA_BASE_URL/OA_SECRET_KEY` | OA 认证配置 |
-
-## License
-
-MIT
