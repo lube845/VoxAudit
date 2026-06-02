@@ -1,0 +1,86 @@
+services:
+  # MySQL数据库
+  mysql:
+    image: mysql:8.0
+    container_name: voxaudit_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-voxaudit_root_2024}
+      MYSQL_USER: ${DB_USER:-voxaudit_admin}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-voxaudit_secure_2024}
+      MYSQL_DATABASE: ${DB_NAME:-voxaudit_db}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "${DB_EXTERNAL_PORT:-3307}:3306"
+    networks:
+      - voxaudit_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-voxaudit_root_2024}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+
+  # 后端API服务
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: voxaudit_backend
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/workspace
+    working_dir: /workspace
+    ports:
+      - "${BACKEND_EXTERNAL_PORT:-8000}:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - voxaudit_network
+    volumes:
+      - ..:/workspace
+    command: sh -c "python -c 'import asyncio; from backend.core.database import init_db; from backend.core.seed import seed_data; asyncio.run(init_db()); asyncio.run(seed_data())' && python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  # MinIO对象存储
+  minio:
+    image: minio/minio:latest
+    container_name: voxaudit_minio
+    environment:
+      MINIO_ROOT_USER: ${OSS_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${OSS_SECRET_KEY:-minioadmin}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    networks:
+      - voxaudit_network
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # 前端服务
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    container_name: voxaudit_frontend
+    ports:
+      - "${FRONTEND_EXTERNAL_PORT:-8888}:80"
+    networks:
+      - voxaudit_network
+
+volumes:
+  mysql_data:
+  minio_data:
+
+networks:
+  voxaudit_network:
+    driver: bridge
