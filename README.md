@@ -1,4 +1,4 @@
-# VoxAudit 智能质检系统
+# VoxAudit 智能语音质检系统
 
 基于 ASR 语音转写 + LLM AI 评分的自动化催收通话质检平台。
 
