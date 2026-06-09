@@ -70,6 +70,7 @@ async def create_rule(
         rule_type=rule_data.rule_type,
         is_veto=rule_data.is_veto if rule_data.rule_type == 'deduction' else False,
         is_latest=True,
+        is_enabled=rule_data.is_enabled if hasattr(rule_data, 'is_enabled') else True,
         published_at=datetime.utcnow(),
         user_id=user_id,
     )
@@ -275,6 +276,7 @@ async def update_rule(
         rule_type=rule.rule_type,
         is_veto=update_data.get('is_veto', rule.is_veto) if rule.rule_type == 'deduction' else False,
         is_latest=True,
+        is_enabled=rule.is_enabled,  # 继承启用状态
         parent_id=rule.id,
         published_at=datetime.utcnow(),
         user_id=user_id,
@@ -308,6 +310,34 @@ async def delete_rule(
     await db.commit()
 
     return {"message": "删除成功"}
+
+
+@router.patch("/{rule_id}/toggle-enabled")
+async def toggle_rule_enabled(
+    rule_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user_required)
+):
+    """切换规则启用状态（仅限最新版本）"""
+    user_id = current_user.get("loginid", "admin")
+    result = await db.execute(
+        select(ScoringRule).where(
+            ScoringRule.id == rule_id,
+            ScoringRule.user_id == user_id
+        )
+    )
+    rule = result.scalar_one_or_none()
+    if not rule:
+        raise HTTPException(status_code=404, detail="规则不存在")
+
+    if not rule.is_latest:
+        raise HTTPException(status_code=400, detail="只能操作最新版本")
+
+    rule.is_enabled = not rule.is_enabled
+    await db.commit()
+    await db.refresh(rule)
+
+    return {"message": "操作成功", "is_enabled": rule.is_enabled}
 
 
 # ========== 规则历史管理 ==========

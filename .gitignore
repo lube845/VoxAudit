@@ -127,6 +127,7 @@ temp/
 # OA Auth (sensitive - contains keys)
 # ------------------
 docker/oa_auth.py
+backend/oa_auth.py
 
 # ------------------
 # Backend
@@ -156,3 +157,5 @@ Jenkinsfile
 *~
 .DS_Store
 Thumbs.db
+
+backend.zip

@@ -2,10 +2,6 @@
   <div class="recording-detail">
     <el-page-header @back="goBack" content="录音详情">
       <template #actions>
-        <el-button type="primary" @click="playAudio" :disabled="!recording">
-          <el-icon><VideoPlay /></el-icon>
-          播放录音
-        </el-button>
         <el-button type="success" @click="exportReport" :disabled="!scoringResult">
           <el-icon><Download /></el-icon>
           导出报告
@@ -16,6 +12,7 @@
     <el-row :gutter="20" style="margin-top: 20px">
       <!-- 左侧：录音信息 -->
       <el-col :span="8">
+        <!-- 播放卡片 -->
         <el-card>
           <template #header>
             <span>基本信息</span>
@@ -46,12 +43,17 @@
           <template #header>
             <span>评分结果</span>
           </template>
-          <el-descriptions :column="2" border>
+           <el-descriptions :column="2" border>
             <el-descriptions-item label="加分总分">
               <span style="color: #67c23a; font-weight: bold">+{{ scoringResult.bonus_score || 0 }}</span>
             </el-descriptions-item>
             <el-descriptions-item label="减分总分">
               <span style="color: #f56c6c; font-weight: bold">-{{ scoringResult.deduction_score || 0 }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="总分" :span="2">
+              <span :style="{ color: scoringResult.total_score >= 60 ? '#67c23a' : scoringResult.total_score < 0 ? '#f56c6c' : '' }" style="font-weight: bold">
+                {{ scoringResult.total_score }}
+              </span>
             </el-descriptions-item>
           </el-descriptions>
 
@@ -99,7 +101,6 @@
                 :key="index"
                 class="transcript-segment"
                 :class="{ 'agent': seg.speaker === 'agent', 'customer': seg.speaker !== 'agent' }"
-                @click="seekTo(seg.start_time)"
               >
                 <div class="segment-speaker">
                   {{ seg.speaker === 'agent' ? '坐席' : '客户' }}
@@ -155,7 +156,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { VideoPlay, Download } from '@element-plus/icons-vue'
+import { Download } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 import api from '@/api'
 
@@ -255,10 +256,6 @@ function copyText() {
   ElMessage.success('已复制到剪贴板')
 }
 
-function seekTo(time) {
-  console.log('seek to', time)
-}
-
 async function retryTranscribe() {
   try {
     await api.recording.retryTranscribe(recording.value.id)
@@ -310,15 +307,6 @@ async function pollScoringResult() {
   }
 }
 
-async function playAudio() {
-  try {
-    const res = await api.recording.getPlayUrl(recording.value.id)
-    window.open(res.play_url, '_blank')
-  } catch (e) {
-    console.error(e)
-  }
-}
-
 async function exportReport() {
   try {
     const response = await api.export.exportSingleRecording(recording.value.id)
@@ -349,7 +337,7 @@ async function loadData() {
   } catch (e) {
     console.error(e)
   }
-  // 兼容单独调用 score 接口的方式（如果 scoring_results 为空）
+   // 兼容单独调用 score 接口的方式（如果 scoring_results 为空）
   if (!scoringResult.value) {
     try {
       const id = route.params.id
@@ -427,7 +415,6 @@ onMounted(() => {
   padding: 10px;
   margin-bottom: 10px;
   border-radius: 5px;
-  cursor: pointer;
   transition: background 0.3s;
 }
 

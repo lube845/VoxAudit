@@ -196,10 +196,11 @@ async def auto_score_recording(recording_id: int):
 
             logger.info(f"[评分] 录音状态={recording.status}, 转写文本长度={len(recording.transcript or '')}")
 
-            # 获取该用户所有最新版本的规则
+            # 获取该用户所有最新版本且已启用的规则
             rules_result = await db.execute(
                 select(ScoringRule).where(
                     ScoringRule.is_latest == True,
+                    ScoringRule.is_enabled == True,
                     ScoringRule.user_id == recording.user_id,
                 )
             )
@@ -237,8 +238,8 @@ async def auto_score_recording(recording_id: int):
                 if scoring_result.get("is_rejected", False):
                     has_veto = True
 
-            # 计算总分
-            final_score = max(0, total_bonus - total_deduction)
+            # 计算总分（允许负分）
+            final_score = total_bonus - total_deduction
 
             # 保存评分结果
             result_record = ScoringResult(
@@ -328,6 +329,9 @@ async def list_recordings(
     keyword: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    score_dimension: Optional[str] = None,
+    score_operator: Optional[str] = None,
+    score_value: Optional[float] = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -361,6 +365,20 @@ async def list_recordings(
             query = query.where(Recording.created_at <= end_dt)
         except ValueError:
             pass
+
+    #分数筛选
+    if score_dimension and score_operator and score_value is not None:
+        column_map = {
+            "bonus": Recording.bonus_score,
+            "deduction": Recording.deduction_score,
+            "total": Recording.total_score,
+        }
+        column = column_map.get(score_dimension)
+        if column is not None:
+            if score_operator == "gte":
+                query = query.where(column >= score_value)
+            elif score_operator == "lte":
+                query = query.where(column <= score_value)
 
     # 获取总数
     count_query = select(func.count()).select_from(query.subquery())

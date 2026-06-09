@@ -77,6 +77,17 @@
             <span class="score bonus">+{{ row.total_score || 0 }}</span>
           </template>
         </el-table-column>
+        <el-table-column label="启用" width="100" align="center">
+          <template #default="{ row }">
+            <el-switch
+              v-model="row.is_enabled"
+              active-color="#67c23a"
+              inactive-color="#909399"
+              :disabled="!row.is_latest"
+              @change="toggleEnabled(row)"
+            />
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="200" align="center">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="viewRule(row)">查看</el-button>
@@ -138,6 +149,17 @@
             <span v-else class="no-veto">否</span>
           </template>
         </el-table-column>
+        <el-table-column label="启用" width="100" align="center">
+          <template #default="{ row }">
+            <el-switch
+              v-model="row.is_enabled"
+              active-color="#67c23a"
+              inactive-color="#909399"
+              :disabled="!row.is_latest"
+              @change="toggleEnabled(row)"
+            />
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="200" align="center">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="viewRule(row)">查看</el-button>
@@ -187,6 +209,11 @@
         <el-descriptions-item label="最新版本">
           <el-tag :type="form.is_latest ? 'success' : 'info'">
             {{ form.is_latest ? '是' : '否' }}
+          </el-tag>
+        </el-descriptions-item>
+        <el-descriptions-item label="启用状态">
+          <el-tag :type="form.is_enabled ? 'success' : 'info'">
+            {{ form.is_enabled ? '是' : '否' }}
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="描述" :span="2">{{ form.description || '无' }}</el-descriptions-item>
@@ -449,7 +476,8 @@ function viewRule(row) {
     rule_type: row.rule_type,
     total_score: row.total_score || 0,
     is_veto: row.is_veto || false,
-    is_latest: row.is_latest
+    is_latest: row.is_latest,
+    is_enabled: row.is_enabled !== undefined ? row.is_enabled : true
   })
   viewDialogVisible.value = true
 }
@@ -522,6 +550,18 @@ async function deleteRule(row) {
   }
 }
 
+async function toggleEnabled(row) {
+  try {
+    await api.rule.toggleEnabled(row.id)
+    ElMessage.success(row.is_enabled ? '规则已启用' : '规则已禁用')
+  } catch (e) {
+    // 恢复原状态
+    row.is_enabled = !row.is_enabled
+    console.error(e)
+    ElMessage.error('操作失败')
+  }
+}
+
 // 查看历史
 async function viewHistory(row) {
   currentRuleId.value = row.id
@@ -545,7 +585,8 @@ function viewVersion(row) {
     description: row.description || '',
     rule_type: row.rule_type,
     total_score: row.total_score || 0,
-    is_latest: row.is_latest
+    is_latest: row.is_latest,
+    is_enabled: row.is_enabled !== undefined ? row.is_enabled : true
   })
   viewDialogVisible.value = true
 }

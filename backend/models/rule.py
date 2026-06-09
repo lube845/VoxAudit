@@ -24,6 +24,7 @@ class ScoringRule(Base):
 
     is_veto = Column(Boolean, default=False, comment="是否否决项")
     is_latest = Column(Boolean, default=True, comment="是否为最新版本")
+    is_enabled = Column(Boolean, default=True, comment="是否启用（启用且最新才参与评分）")
 
     parent_id = Column(Integer, nullable=True, comment="上一版本ID")
 

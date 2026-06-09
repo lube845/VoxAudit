@@ -84,6 +84,37 @@
           style="width: 200px"
           @change="handleDateChange"
         />
+        <div class="score-filter" :class="{ active: queryParams.score_dimension || queryParams.score_operator || queryParams.score_value }">
+          <span class="score-filter-label">分数</span>
+          <el-select
+            v-model="queryParams.score_dimension"
+            placeholder="维度"
+            clearable
+            style="width: 80px"
+            @change="handleScoreFilterChange"
+          >
+            <el-option label="加分" value="bonus" />
+            <el-option label="扣分" value="deduction" />
+            <el-option label="总分" value="total" />
+          </el-select>
+          <el-select
+            v-model="queryParams.score_operator"
+            placeholder="条件"
+            clearable
+            style="width: 80px"
+            @change="handleScoreFilterChange"
+          >
+            <el-option label="≥" value="gte" />
+            <el-option label="≤" value="lte" />
+          </el-select>
+          <el-input
+            v-model="queryParams.score_value"
+            placeholder="分值"
+            clearable
+            style="width: 80px"
+            @input="handleScoreFilterChange"
+          />
+        </div>
         <span class="total-count">共 {{ total }} 条</span>
       </div>
 
@@ -235,6 +266,9 @@ const queryParams = reactive({
   is_rejected: '',
   start_date: '',
   end_date: '',
+  score_dimension: '',
+  score_operator: '',
+  score_value: '',
   page: 1,
   page_size: 20
 })
@@ -313,6 +347,10 @@ function handleDateChange(val) {
     queryParams.start_date = ''
     queryParams.end_date = ''
   }
+  handleQuery()
+}
+
+function handleScoreFilterChange() {
   handleQuery()
 }
 
@@ -571,6 +609,47 @@ onMounted(() => {
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
+}
+
+.score-filter {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  padding: 0 8px;
+  background: #fafafa;
+}
+
+.score-filter.active {
+  border-color: #409eff;
+  background: #fff;
+}
+
+.score-filter-label {
+  color: #909399;
+  font-size: 13px;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.score-filter :deep(.el-input__wrapper) {
+  box-shadow: none !important;
+  background: transparent;
+}
+
+.score-filter :deep(.el-input__inner) {
+  font-size: 13px;
+}
+
+.score-filter :deep(.el-input) {
+  --el-input-border-color: transparent;
+}
+
+.score-filter :deep(.el-input:hover .el-input__wrapper),
+.score-filter :deep(.el-input.is-focus .el-input__wrapper) {
+  box-shadow: none !important;
+  background: transparent;
 }
 
 .total-count {

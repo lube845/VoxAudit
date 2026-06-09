@@ -14,6 +14,7 @@ class ScoringRuleBase(BaseModel):
     total_score: float = 100.0
     rule_type: str = "bonus"
     is_veto: bool = False
+    is_enabled: bool = True
 
 
 class ScoringRuleCreate(ScoringRuleBase):
@@ -25,6 +26,7 @@ class ScoringRuleUpdate(BaseModel):
     description: Optional[str] = None
     total_score: Optional[float] = Field(None, gt=0)
     is_veto: Optional[bool] = None
+    is_enabled: Optional[bool] = None
 
 
 class ScoringRuleResponse(ScoringRuleBase):

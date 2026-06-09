@@ -96,9 +96,26 @@ class ASRService:
 {dialogue_text}
 判断哪个是坐席哪个是客户，只返回JSON格式：
 {{"speaker_roles": {{"speaker_0": "agent"或"customer", ...}}}}"""
+        def _try_parse_json(text: str):
+            """尝试解析JSON，自动修复常见格式错误"""
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                # 尝试修复常见格式错误
+                # 1. 移除尾随逗号
+                text = re.sub(r',(\s*[}\]])', r'\1', text)
+                # 2. 修复中文引号
+                text = text.replace('""', '"')
+                try:
+                    return json.loads(text)
+                except json.JSONDecodeError:
+                    return None
+
         try:
             role_result = await self._call_llm(prompt)
-            role_info = json.loads(role_result)
+            role_info = _try_parse_json(role_result)
+            if role_info is None:
+                raise Exception("JSON解析失败")
             speaker_roles = role_info.get("speaker_roles", {})
             customer_map = {}
             customer_counter = 0
@@ -118,7 +135,21 @@ class ASRService:
             return segments
         except Exception as e:
             import logging
-            logging.warning("LLM角色判断失败: " + str(e))
+            # 区分不同错误类型，提供更详细的调试信息
+            error_msg = str(e)
+            error_type = type(e).__name__
+            if "LLM API Endpoint 未配置" in error_msg:
+                logging.warning(f"LLM角色判断跳过：LLM API未配置 ({error_type}: {error_msg})")
+            elif "LLM返回内容为空" in error_msg:
+                logging.warning(f"LLM角色判断失败：LLM返回内容为空 ({error_type}: {error_msg})")
+            elif isinstance(e, httpx.HTTPStatusError):
+                logging.warning(f"LLM角色判断失败：HTTP错误 {e.response.status_code} ({error_type}: {error_msg})")
+            elif isinstance(e, httpx.TimeoutException):
+                logging.warning(f"LLM角色判断失败：LLM请求超时 ({error_type}: {error_msg})")
+            elif isinstance(e, json.JSONDecodeError) or "JSON解析失败" in error_msg:
+                logging.warning(f"LLM角色判断失败：LLM返回格式无效JSON ({error_type}: {error_msg})")
+            else:
+                logging.warning(f"LLM角色判断失败：{error_type}: {error_msg}")
             customer_counter = 0
             for seg in segments:
                 if seg.get("speaker") == "speaker_0":
@@ -130,12 +161,35 @@ class ASRService:
                     seg["speaker_name"] = "客户" + str(customer_counter)
             return segments
 
+    def _extract_json(self, text: str) -> str:
+        """从LLM返回内容中提取JSON字符串"""
+        # 移除思考标签
+        text = re.sub(r'<think>.*?\n\n', '', text, flags=re.DOTALL).strip()
+
+        # 尝试从markdown代码块中提取
+        json_match = re.search(r'```(?:json)?\s*([\s\S]*?)```', text)
+        if json_match:
+            return json_match.group(1).strip()
+
+        # 尝试找到最后一个 {及其后的内容
+        json_start = text.rfind("{")
+        if json_start >= 0:
+            return text[json_start:]
+
+        return text
+
     async def _call_llm(self, prompt):
         """调用LLM API"""
         if not settings.LLM_API_ENDPOINT:
             raise Exception("LLM API Endpoint 未配置")
         headers = {"Authorization": "Bearer " + settings.LLM_API_KEY, "Content-Type": "application/json"} if settings.LLM_API_KEY else {"Content-Type": "application/json"}
-        payload = {"model": settings.LLM_MODEL, "messages": [{"role": "user", "content": prompt}], "max_tokens": 1024}
+        payload = {
+            "model": settings.LLM_MODEL,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": 1024,
+            "chat_template_kwargs": {"enable_thinking": False},
+            "stream": false,
+        }
         async with httpx.AsyncClient(timeout=60) as client:
             response = await client.post(settings.LLM_API_ENDPOINT, headers=headers, json=payload)
             response.raise_for_status()
@@ -143,11 +197,7 @@ class ASRService:
             text = result["choices"][0]["message"].get("content") or ""
             if not text:
                 raise Exception("LLM返回内容为空")
-            text = re.sub(r'<think>.*?\n\n', '', text, flags=re.DOTALL).strip()
-            json_start = text.rfind("{")
-            if json_start >= 0:
-                text = text[json_start:]
-            return text
+            return self._extract_json(text)
 
     def _parse_transcript_result(self, result: Dict) -> Dict:
         """解析ASR返回的Markdown结果"""

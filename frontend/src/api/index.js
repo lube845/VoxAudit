@@ -58,6 +58,7 @@ export default {
     create: (data) => request.post('/rules', data),
     update: (id, data) => request.put(`/rules/${id}`, data),
     delete: (id) => request.delete(`/rules/${id}`),
+    toggleEnabled: (id) => request.patch(`/rules/${id}/toggle-enabled`),
     generateCode: (ruleType) => request.get(`/rules/generate-code/${ruleType}`),
     export: () => request.get('/rules/ruleexport'),
     import: (data) => request.post('/rules/ruleimport', data),
@@ -70,7 +71,18 @@ export default {
   },
 
   recording: {
-    list: (params) => request.get('/recordings', { params }),
+    list: (params) => {
+      // 过滤掉无效的分数筛选参数，避免422
+      const filtered = { ...params }
+      if (filtered.score_dimension && filtered.score_operator && filtered.score_value !== '') {
+        filtered.score_value = Number(filtered.score_value)
+      } else {
+        delete filtered.score_dimension
+        delete filtered.score_operator
+        delete filtered.score_value
+      }
+      return request.get('/recordings', { params: filtered })
+    },
     get: (id) => request.get(`/recordings/${id}`),
     initUpload: (data) => request.post('/recordings/init-upload', data),
     upload: (id, formData) => request.post(`/recordings/${id}/upload`, formData, {

@@ -79,9 +79,9 @@ class OSSService:
 
         def _do_get_url():
             try:
-                bucket = bucket or self.bucket
+                _bucket = bucket if bucket is not None else self.bucket
                 url = self.client.presigned_get_object(
-                    bucket,
+                    _bucket,
                     object_key,
                     expires=timedelta(seconds=expires),
                 )
@@ -112,8 +112,8 @@ class OSSService:
     def get_file_info(self, object_key: str, bucket: str = None) -> dict:
         """获取文件信息（同步）"""
         try:
-            bucket = bucket or self.bucket
-            stat = self.client.stat_object(bucket, object_key)
+            _bucket = bucket if bucket is not None else self.bucket
+            stat = self.client.stat_object(_bucket, object_key)
             return {
                 "size": stat.size,
                 "etag": stat.etag,
@@ -126,8 +126,8 @@ class OSSService:
     def check_file_exists(self, object_key: str, bucket: str = None) -> bool:
         """检查文件是否存在（同步）"""
         try:
-            bucket = bucket or self.bucket
-            self.client.stat_object(bucket, object_key)
+            _bucket = bucket if bucket is not None else self.bucket
+            self.client.stat_object(_bucket, object_key)
             return True
         except S3Error:
             return False

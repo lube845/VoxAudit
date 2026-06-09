@@ -127,6 +127,8 @@ class AIScoringService:
             ],
             "temperature": settings.LLM_TEMPERATURE,
             "max_tokens": settings.LLM_MAX_TOKENS,
+            "chat_template_kwargs": {"enable_thinking": False},
+            "stream": False,
         }
 
         endpoint = settings.LLM_API_ENDPOINT
