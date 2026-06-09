@@ -1,4 +1,4 @@
-# VoxAudit 智能质检系统
+# VoxAudit 智能语音质检系统
 
 基于 ASR 语音转写 + LLM AI 评分的自动化催收通话质检平台。
 
@@ -135,7 +135,3 @@ VoxAudit/
 | `LLM_API_ENDPOINT/LLM_API_KEY/LLM_MODEL` | 大模型 API |
 | `ASR_API_URL` | 语音转写服务地址 |
 | `OA_BASE_URL/OA_SECRET_KEY` | OA 认证配置 |
-
-## License
-
-MIT
