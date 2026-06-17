@@ -4,17 +4,32 @@
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from typing import Optional, List
-from datetime import datetime, timedelta
+from datetime import timedelta, datetime
 from sqlalchemy import select, func, distinct
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.database import get_db
 from backend.core.config import settings
+from backend.core.datetime_utils import get_current_time, get_timezone
+from zoneinfo import ZoneInfo
 from backend.models.recording import Recording, RecordingStatus, ScoringResult
 from backend.models.rule import ScoringRule
 from backend.api.auth import get_current_user_required
+from backend.oa_auth import get_user_info_from_oa
 
 router = APIRouter(prefix="/statistics/users", tags=["用户统计"])
+
+
+def _aware(dt):
+    """Ensure a datetime is timezone-aware for comparison with get_current_time()."""
+    if dt is None:
+        return dt
+    if dt.tzinfo is None:
+        try:
+            return dt.replace(tzinfo=ZoneInfo(get_timezone()))
+        except Exception:
+            return dt
+    return dt
 
 
 def require_admin(current_user: dict = Depends(get_current_user_required)) -> dict:
@@ -31,8 +46,10 @@ class UserStats(BaseModel):
     name: str  # 姓名
     department: str  # 部门
     total_recordings: int  # 总录音数
+    scored_recordings: int  # 已评分录音数
     total_duration: float  # 总录音时长(秒)
     avg_score: float  # 平均分
+    total_score: float  # 总分
     total_storage_bytes: int  # 总占用存储(字节)
     score_distribution: dict  # 分数分布 {0-60: count, 60-70: count, ...}
     recordings_by_status: dict  # 各状态录音数
@@ -54,7 +71,7 @@ class UserDetailStats(BaseModel):
     # 规则统计
     total_rules: int
     active_rules: int
-    latest_rule_version: Optional[str]
+    latest_scoring_time: Optional[datetime]
 
     # 录音统计
     total_recordings: int
@@ -89,28 +106,12 @@ class UsersOverview(BaseModel):
 
 @router.get("/overview", response_model=UsersOverview)
 async def get_users_overview(
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
     current_user: dict = Depends(require_admin)
 ):
     """
     获取所有用户的概览统计
     """
     db: AsyncSession = await get_db().__anext__()
-
-    # 默认时间范围：全部
-    start_dt = None
-    end_dt = None
-    if start_date:
-        try:
-            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
-        except ValueError:
-            pass
-    if end_date:
-        try:
-            end_dt = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
-        except ValueError:
-            pass
 
     # 获取不同时区用户数
     all_users_result = await db.execute(
@@ -119,7 +120,7 @@ async def get_users_overview(
     total_users = all_users_result.scalar() or 0
 
     # 获取活跃用户数（30天内有活动）
-    active_date = datetime.now() - timedelta(days=30)
+    active_date = get_current_time() - timedelta(days=30)
     active_users_result = await db.execute(
         select(func.count(distinct(Recording.user_id)))
         .where(Recording.created_at >= active_date)
@@ -156,8 +157,6 @@ async def get_users_overview(
 
 @router.get("/list", response_model=List[UserStats])
 async def get_users_stats(
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
     min_recordings: int = Query(0, ge=0),
     current_user: dict = Depends(require_admin)
 ):
@@ -165,20 +164,6 @@ async def get_users_stats(
     获取所有用户的统计数据列表
     """
     db: AsyncSession = await get_db().__anext__()
-
-    # 时间范围
-    start_dt = None
-    end_dt = None
-    if start_date:
-        try:
-            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
-        except ValueError:
-            pass
-    if end_date:
-        try:
-            end_dt = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
-        except ValueError:
-            pass
 
     # 获取所有用户列表
     users_result = await db.execute(
@@ -192,14 +177,10 @@ async def get_users_stats(
     for user_row in user_groups:
         user_id = user_row.user_id or "unknown"
 
-        # 获取该用户的录音列表（带时间筛选）
-        query = select(Recording).where(Recording.user_id == user_id)
-        if start_dt:
-            query = query.where(Recording.created_at >= start_dt)
-        if end_dt:
-            query = query.where(Recording.created_at < end_dt)
-
-        recordings_result = await db.execute(query)
+        # 获取该用户的录音列表
+        recordings_result = await db.execute(
+            select(Recording).where(Recording.user_id == user_id)
+        )
         recordings = recordings_result.scalars().all()
 
         if not recordings:
@@ -218,13 +199,17 @@ async def get_users_stats(
 
         # 评分统计
         scored_recordings = [r for r in recordings if r.total_score is not None]
-        avg_score = sum(r.total_score or 0 for r in scored_recordings) / len(scored_recordings) if scored_recordings else 0
+        scored_count = len(scored_recordings)
+        total_score_sum = sum(r.total_score or 0 for r in scored_recordings)
+        avg_score = total_score_sum / scored_count if scored_count else 0
 
         # 分数分布
-        score_dist = {"0-60": 0, "60-70": 0, "70-80": 0, "80-90": 0, "90-100": 0}
+        score_dist = {"<0": 0, "0-60": 0, "60-70": 0, "70-80": 0, "80-90": 0, "90-100": 0, ">100": 0}
         for r in scored_recordings:
             score = r.total_score or 0
-            if score < 60:
+            if score < 0:
+                score_dist["<0"] += 1
+            elif score < 60:
                 score_dist["0-60"] += 1
             elif score < 70:
                 score_dist["60-70"] += 1
@@ -232,8 +217,10 @@ async def get_users_stats(
                 score_dist["70-80"] += 1
             elif score < 90:
                 score_dist["80-90"] += 1
-            else:
+            elif score <= 100:
                 score_dist["90-100"] += 1
+            else:
+                score_dist[">100"] += 1
 
         # 状态分布
         status_dist = {}
@@ -242,25 +229,32 @@ async def get_users_stats(
             status_dist[status] = status_dist.get(status, 0) + 1
 
         # 近30天活动
-        recent_date = datetime.now() - timedelta(days=30)
-        recent_recordings = [r for r in recordings if r.created_at and r.created_at >= recent_date]
+        recent_date = get_current_time() - timedelta(days=30)
+        recent_recordings = [r for r in recordings if r.created_at and _aware(r.created_at) >= recent_date]
         recent_activity_count = len(recent_recordings)
 
-        # 获取用户名信息（从OA获取，简化处理）
-        name = user_id  # 默认用工号作姓名
-        department = ""
+        # 获取用户名信息（从OA获取）
+        oa_info = get_user_info_from_oa(user_id)
+        if oa_info:
+            name = oa_info.get("姓名", user_id)
+            department = oa_info.get("部门", "")
+        else:
+            name = user_id
+            department = ""
 
         results.append(UserStats(
             loginid=user_id,
             name=name,
             department=department,
             total_recordings=total_recordings,
+            scored_recordings=scored_count,
             total_duration=round(total_duration, 2),
             avg_score=round(avg_score, 2),
+            total_score=round(total_score_sum, 2),
             total_storage_bytes=total_size,
             score_distribution=score_dist,
             recordings_by_status=status_dist,
-            recent_activity=[{"date": str(datetime.now().date()), "count": recent_activity_count}]
+            recent_activity=[{"date": str(get_current_time().date()), "count": recent_activity_count}]
         ))
 
     await db.close()
@@ -270,8 +264,6 @@ async def get_users_stats(
 @router.get("/{loginid}/detail", response_model=UserDetailStats)
 async def get_user_detail_stats(
     loginid: str,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
     current_user: dict = Depends(require_admin)
 ):
     """
@@ -279,39 +271,23 @@ async def get_user_detail_stats(
     """
     db: AsyncSession = await get_db().__anext__()
 
-    # 时间范围
-    start_dt = None
-    end_dt = None
-    if start_date:
-        try:
-            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
-        except ValueError:
-            pass
-    if end_date:
-        try:
-            end_dt = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
-        except ValueError:
-            pass
+    # 获取录音统计（需先查询，用于计算最近评分时间）
+    recordings_result = await db.execute(
+        select(Recording).where(Recording.user_id == loginid)
+    )
+    recordings = list(recordings_result.scalars().all())
 
     # 获取规则统计
     rules_result = await db.execute(
         select(ScoringRule).where(ScoringRule.user_id == loginid)
     )
     rules = list(rules_result.scalars().all())
-    total_rules = len(rules)
-    active_rules = len([r for r in rules if r.is_latest])
-    latest_rule = max((r for r in rules if r.is_latest), key=lambda r: r.version, default=None)
-    latest_rule_version = latest_rule.version if latest_rule else None
-
-    # 获取录音统计
-    query = select(Recording).where(Recording.user_id == loginid)
-    if start_dt:
-        query = query.where(Recording.created_at >= start_dt)
-    if end_dt:
-        query = query.where(Recording.created_at < end_dt)
-
-    recordings_result = await db.execute(query)
-    recordings = list(recordings_result.scalars().all())
+    # 规则总数 = is_latest=True 的规则数量
+    total_rules = len([r for r in rules if r.is_latest])
+    # 活跃规则 = is_latest=True 且 is_enabled=True 的数量
+    active_rules = len([r for r in rules if r.is_latest and r.is_enabled])
+    # 最近评分时间 = 该用户最近一次录音的 updated_at
+    latest_scoring_time = max((r.updated_at for r in recordings if r.updated_at), default=None)
 
     total_recordings = len(recordings)
     uploaded_recordings = len([r for r in recordings if r.status == RecordingStatus.UPLOADED])
@@ -349,9 +325,14 @@ async def get_user_detail_stats(
 
     # 分数分布
     score_dist_list = []
-    score_ranges = [("0-60", 0, 60), ("60-70", 60, 70), ("70-80", 70, 80), ("80-90", 80, 90), ("90-100", 90, 101)]
+    score_ranges = [("<0", None, 0), ("0-60", 0, 60), ("60-70", 60, 70), ("70-80", 70, 80), ("80-90", 80, 90), ("90-100", 90, 101), (">100", 100, None)]
     for label, low, high in score_ranges:
-        count = len([r for r in scored if low <= (r.total_score or 0) < high])
+        if low is None:
+            count = len([r for r in scored if (r.total_score or 0) < high])
+        elif high is None:
+            count = len([r for r in scored if (r.total_score or 0) >= low])
+        else:
+            count = len([r for r in scored if low <= (r.total_score or 0) < high])
         percentage = (count / len(scored) * 100) if scored else 0
         score_dist_list.append(ScoreRangeItem(
             label=label,
@@ -366,20 +347,26 @@ async def get_user_detail_stats(
             date_key = r.created_at.strftime('%Y-%m-%d')
             timeline[date_key] = timeline.get(date_key, 0) + 1
 
-    recordings_timeline = [{"date": k, "count": v} for k, v in sorted(timeline.items())]
+    recordings_timeline = [{"date": k, "count": v} for k, v in sorted(timeline.items(), reverse=True)]
 
-    # 获取用户姓名（从最近一条录音的agent_name或用loginid）
-    name = loginid
+    # 获取用户姓名和部门（从OA获取）
+    oa_info = get_user_info_from_oa(loginid)
+    if oa_info:
+        name = oa_info.get("姓名", loginid)
+        department = oa_info.get("部门", "")
+    else:
+        name = loginid
+        department = ""
 
     await db.close()
 
     return UserDetailStats(
         loginid=loginid,
         name=name,
-        department="",
+        department=department,
         total_rules=total_rules,
         active_rules=active_rules,
-        latest_rule_version=latest_rule_version,
+        latest_scoring_time=latest_scoring_time,
         total_recordings=total_recordings,
         uploaded_recordings=uploaded_recordings,
         transcribed_recordings=transcribed_recordings,
@@ -398,59 +385,3 @@ async def get_user_detail_stats(
     )
 
 
-@router.get("/leaderboard", response_model=List[dict])
-async def get_users_leaderboard(
-    limit: int = Query(10, ge=1, le=50),
-    sort_by: str = Query("total_score", regex="^(total_score|total_recordings|avg_score)$"),
-    current_user: dict = Depends(require_admin)
-):
-    """
-    获取用户排行榜（按平均分/录音数/总分）
-    """
-    db: AsyncSession = await get_db().__anext__()
-
-    # 获取所有用户及其统计数据
-    users_result = await db.execute(
-        select(Recording.user_id, func.count(Recording.id).label('recording_count'))
-        .group_by(Recording.user_id)
-    )
-    user_groups = users_result.fetchall()
-
-    leaderboard = []
-
-    for user_row in user_groups:
-        user_id = user_row.user_id or "unknown"
-
-        recordings_result = await db.execute(
-            select(Recording).where(Recording.user_id == user_id)
-        )
-        recordings = list(recordings_result.scalars().all())
-
-        if not recordings:
-            continue
-
-        scored = [r for r in recordings if r.total_score is not None]
-        total_recordings = len(recordings)
-        avg_score = sum(r.total_score or 0 for r in scored) / len(scored) if scored else 0
-        total_score_sum = sum(r.total_score or 0 for r in scored)
-
-        leaderboard.append({
-            "loginid": user_id,
-            "name": user_id,
-            "total_recordings": total_recordings,
-            "scored_recordings": len(scored),
-            "avg_score": round(avg_score, 2),
-            "total_score": round(total_score_sum, 2),
-        })
-
-    await db.close()
-
-    # 排序
-    if sort_by == "total_score":
-        leaderboard.sort(key=lambda x: x["total_score"], reverse=True)
-    elif sort_by == "avg_score":
-        leaderboard.sort(key=lambda x: x["avg_score"], reverse=True)
-    else:  # total_recordings
-        leaderboard.sort(key=lambda x: x["total_recordings"], reverse=True)
-
-    return leaderboard[:limit]

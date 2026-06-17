@@ -23,7 +23,7 @@
             </div>
             <div class="stat-info">
               <div class="stat-value">{{ overview.total_recordings }}</div>
-              <div class="stat-label">上传录音</div>
+              <div class="stat-label">上传录音数</div>
             </div>
           </div>
         </el-card>
@@ -36,7 +36,7 @@
             </div>
             <div class="stat-info">
               <div class="stat-value">{{ overview.scored_count }}</div>
-              <div class="stat-label">已评分</div>
+              <div class="stat-label">已评分录音数</div>
             </div>
           </div>
         </el-card>
@@ -138,7 +138,7 @@
       <el-col :span="16">
         <el-card class="chart-card">
           <template #header>
-            <span class="card-title">每日评分趋势</span>
+            <span class="card-title">整体平均分</span>
           </template>
           <div ref="trendChartRef" class="chart-container"></div>
         </el-card>
@@ -146,7 +146,7 @@
       <el-col :span="8">
         <el-card class="chart-card">
           <template #header>
-            <span class="card-title">违规率/否决率趋势</span>
+            <span class="card-title">违规率/否决率</span>
           </template>
           <div ref="violationChartRef" class="chart-container"></div>
         </el-card>
@@ -157,7 +157,16 @@
       <el-col :span="12">
         <el-card class="chart-card">
           <template #header>
-            <span class="card-title">Top 10 坐席评分</span>
+            <div class="card-header">
+              <span class="card-title">Top 10 坐席情况</span>
+              <el-radio-group v-model="agentSortBy" size="small" @change="loadAgentStats">
+                <el-radio-button value="count">录音数</el-radio-button>
+                <el-radio-button value="avg_score">平均分</el-radio-button>
+                <el-radio-button value="violation_rate">违规率</el-radio-button>
+                <el-radio-button value="rejection_rate">否决率</el-radio-button>
+                <el-radio-button value="total_score">总分</el-radio-button>
+              </el-radio-group>
+            </div>
           </template>
           <div ref="agentChartRef" class="chart-container"></div>
         </el-card>
@@ -165,7 +174,13 @@
       <el-col :span="12">
         <el-card class="chart-card">
           <template #header>
-            <span class="card-title">规则命中统计</span>
+            <div class="card-header">
+              <span class="card-title">规则命中 Top 10</span>
+              <el-radio-group v-model="ruleType" size="small" @change="loadRuleStats">
+                <el-radio-button value="bonus">加分规则</el-radio-button>
+                <el-radio-button value="deduction">扣分规则</el-radio-button>
+              </el-radio-group>
+            </div>
           </template>
           <div ref="ruleChartRef" class="chart-container"></div>
         </el-card>
@@ -178,9 +193,12 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { Refresh, Microphone, DocumentChecked, Star, Warning } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
+import { now, formatDate } from '@/utils/timezone'
 import api from '@/api'
 
 const timeRange = ref('7')
+const agentSortBy = ref('count')
+const ruleType = ref('bonus')
 const trendChartRef = ref(null)
 const violationChartRef = ref(null)
 const agentChartRef = ref(null)
@@ -190,6 +208,7 @@ let trendChart = null
 let violationChart = null
 let agentChart = null
 let ruleChart = null
+let ruleChart2 = null
 
 const overview = ref({
   total_recordings: 0,
@@ -224,12 +243,9 @@ const bonusRate = computed(() => {
 })
 
 function getDateRange() {
-  const now = new Date()
-  const end = now.toISOString().slice(0, 19).replace('T', ' ')
-  const start = new Date(now)
-  start.setDate(start.getDate() - (parseInt(timeRange.value) - 1))
-  const startStr = start.toISOString().slice(0, 19).replace('T', ' ')
-  return { start: startStr, end }
+  const end = now().endOf('day').format('YYYY-MM-DD HH:mm:ss')
+  const start = now().subtract(parseInt(timeRange.value) - 1, 'day').startOf('day').format('YYYY-MM-DD HH:mm:ss')
+  return { start_date: start, end_date: end }
 }
 
 async function loadOverview() {
@@ -258,7 +274,7 @@ async function loadTrend() {
 async function loadAgentStats() {
   try {
     const dates = getDateRange()
-    const data = await api.statistics.agentStats(dates)
+    const data = await api.statistics.agentStats({ ...dates, sort_by: agentSortBy.value })
     await nextTick()
     renderAgentChart(data)
   } catch (e) {
@@ -269,7 +285,7 @@ async function loadAgentStats() {
 async function loadRuleStats() {
   try {
     const dates = getDateRange()
-    const data = await api.statistics.ruleStats(dates)
+    const data = await api.statistics.ruleHitStats({ ...dates, item_type: ruleType.value })
     await nextTick()
     renderRuleChart(data)
   } catch (e) {
@@ -294,21 +310,68 @@ function renderTrendChart() {
   }
   if (!trendData.value.length) return
 
-  const dates = trendData.value.map(d => d.date.slice(5))
-  const scores = trendData.value.map(d => d.avg_score)
-  const bonus = trendData.value.map(d => d.avg_bonus)
-  const deduction = trendData.value.map(d => d.avg_deduction)
+  const dates = trendData.value.map(d => d.date)
+  const avgScores = trendData.value.map(d => d.avg_score)
+  const avgBonuses = trendData.value.map(d => d.avg_bonus)
+  const avgDeductions = trendData.value.map(d => d.avg_deduction)
+
+  // 自适应纵轴范围
+  const allValues = [...avgScores, ...avgBonuses, ...avgDeductions].filter(v => v !== null && v !== undefined)
+  const dataMin = Math.min(...allValues)
+  const dataMax = Math.max(...allValues)
+  const padding = Math.max(Math.abs(dataMin), Math.abs(dataMax)) * 0.15 || 10
+  const yMin = Math.floor(dataMin - padding)
+  const yMax = Math.ceil(dataMax + padding)
 
   trendChart.setOption({
-    tooltip: { trigger: 'axis' },
-    legend: { data: ['平均分', '平均加分', '平均扣分'], bottom: 0 },
-    grid: { left: 50, right: 20, top: 20, bottom: 50 },
-    xAxis: { type: 'category', data: dates },
-    yAxis: { type: 'value', name: '分数' },
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params) => {
+        let result = `<strong>${params[0].axisValue}</strong><br/>`
+        params.forEach(p => {
+          if (p.value !== null && p.value !== undefined) {
+            result += `<span style="color:${p.color}">●</span> ${p.seriesName}：${p.value}分<br/>`
+          }
+        })
+        return result
+      }
+    },
+    legend: { data: ['平均分', '平均加分', '平均扣分'], top: 0, right: 0, textStyle: { fontSize: 11 } },
+    grid: { left: 50, right: 20, top: 30, bottom: 30 },
+    xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 11 } },
+    yAxis: { type: 'value', min: yMin, max: yMax, axisLabel: { fontSize: 11 } },
     series: [
-      { name: '平均分', type: 'line', data: scores, smooth: true, itemStyle: { color: '#409eff' } },
-      { name: '平均加分', type: 'line', data: bonus, smooth: true, itemStyle: { color: '#67c23a' } },
-      { name: '平均扣分', type: 'line', data: deduction, smooth: true, itemStyle: { color: '#f56c6c' } }
+      {
+        name: '平均分',
+        type: 'line',
+        data: avgScores,
+        smooth: true,
+        itemStyle: { color: '#409eff' },
+        lineStyle: { width: 2 },
+        areaStyle: { color: 'rgba(64, 158, 255, 0.1)' },
+        symbol: 'circle',
+        symbolSize: 6,
+      },
+      {
+        name: '平均加分',
+        type: 'line',
+        data: avgBonuses,
+        smooth: true,
+        itemStyle: { color: '#67c23a' },
+        lineStyle: { width: 2 },
+        symbol: 'circle',
+        symbolSize: 5,
+      },
+      {
+        name: '平均扣分',
+        type: 'line',
+        data: avgDeductions,
+        smooth: true,
+        itemStyle: { color: '#f56c6c' },
+        lineStyle: { width: 2 },
+        symbol: 'circle',
+        symbolSize: 5,
+      }
     ]
   })
 }
@@ -319,28 +382,51 @@ function renderViolationChart() {
   }
   if (!trendData.value.length) return
 
-  const dates = trendData.value.map(d => d.date.slice(5))
-  const violationRates = trendData.value.map(d => d.violation_rate || 0)
-  const rejectionRates = trendData.value.map(d => d.rejection_rate || 0)
+  const dates = trendData.value.map(d => d.date)
+  const violationRates = trendData.value.map(d => d.violation_rate)
+  const rejectionRates = trendData.value.map(d => d.rejection_rate)
 
   violationChart.setOption({
-    tooltip: { trigger: 'axis', formatter: '{c}%' },
-    legend: { data: ['违规率', '否决率'], bottom: 0 },
-    grid: { left: 50, right: 20, top: 20, bottom: 50 },
-    xAxis: { type: 'category', data: dates },
-    yAxis: { type: 'value', name: '比率', axisLabel: { formatter: '{value}%' }, max: 100 },
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params) => {
+        const date = params[0].axisValue
+        const vr = params.find(p => p.seriesName === '违规率')
+        const rr = params.find(p => p.seriesName === '否决率')
+        return `<strong>${date}</strong><br/>
+          <span style="color:#f56c6c">●</span> 违规率：${vr ? vr.value : 0}%<br/>
+          <span style="color:#e6a23c">●</span> 否决率：${rr ? rr.value : 0}%`
+      }
+    },
+    legend: { data: ['违规率', '否决率'], top: 0, right: 0, textStyle: { fontSize: 11 } },
+    grid: { left: 50, right: 20, top: 30, bottom: 30 },
+    xAxis: { type: 'category', data: dates, axisLabel: { fontSize: 11 } },
+    yAxis: {
+      type: 'value',
+      min: 0,
+      max: 100,
+      axisLabel: { fontSize: 11, formatter: '{value}%' }
+    },
     series: [
       {
         name: '违规率',
-        type: 'bar',
+        type: 'line',
         data: violationRates,
-        itemStyle: { color: '#f56c6c' }
+        smooth: true,
+        itemStyle: { color: '#f56c6c' },
+        lineStyle: { width: 2 },
+        symbol: 'circle',
+        symbolSize: 5,
       },
       {
         name: '否决率',
-        type: 'bar',
+        type: 'line',
         data: rejectionRates,
-        itemStyle: { color: '#e6a23c' }
+        smooth: true,
+        itemStyle: { color: '#e6a23c' },
+        lineStyle: { width: 2 },
+        symbol: 'circle',
+        symbolSize: 5,
       }
     ]
   })
@@ -353,18 +439,88 @@ function renderAgentChart(data) {
   if (!data.length) return
 
   const names = data.map(d => d.agent_name.slice(0, 6))
-  const scores = data.map(d => d.avg_score)
+
+  // 录音数视图：堆叠柱状图（已评分 + 未评分）
+  if (agentSortBy.value === 'count') {
+    const scoredCounts = data.map(d => d.count || 0).reverse()
+    const unscoredCounts = data.map(d => d.unscored_count || 0).reverse()
+    const totals = data.map(d => (d.count || 0) + (d.unscored_count || 0)).reverse()
+
+    agentChart.setOption({
+      tooltip: {
+        trigger: 'axis',
+        formatter: (params) => {
+          const idx = params[0].dataIndex
+          const total = totals[idx]
+          const scored = scoredCounts[idx]
+          const unscored = unscoredCounts[idx]
+          return `<strong>${names[idx]}</strong><br/>已评分：${scored}条<br/>未评分：${unscored}条<br/>合计：${total}条`
+        }
+      },
+      legend: { data: ['已评分', '未评分'], top: 0, right: 0, textStyle: { fontSize: 11 } },
+      grid: { left: 60, right: 20, top: 30, bottom: 30 },
+      xAxis: { type: 'value', name: '录音数' },
+      yAxis: { type: 'category', data: names, name: '坐席' },
+      series: [
+        {
+          name: '已评分',
+          type: 'bar',
+          stack: 'total',
+          data: scoredCounts,
+          itemStyle: { color: '#409eff' },
+          label: { show: true, position: 'insideRight', formatter: (p) => p.value > 0 ? p.value : '' }
+        },
+        {
+          name: '未评分',
+          type: 'bar',
+          stack: 'total',
+          data: unscoredCounts,
+          itemStyle: { color: '#e6a23c' },
+          label: { show: true, position: 'insideRight', formatter: (p) => p.value > 0 ? p.value : '' }
+        }
+      ]
+    })
+    return
+  }
+
+  // 其他视图保持原有逻辑
+  const dimFieldMap = {
+    avg_score: 'avg_score',
+    violation_rate: 'violation_rate',
+    rejection_rate: 'rejection_rate',
+    total_score: 'total_score_computed',
+  }
+  const dimLabelMap = {
+    avg_score: '平均分',
+    violation_rate: '违规率',
+    rejection_rate: '否决率',
+    total_score: '总分',
+  }
+  const dimUnitMap = {
+    avg_score: '分',
+    violation_rate: '%',
+    rejection_rate: '%',
+    total_score: '分',
+  }
+  const field = dimFieldMap[agentSortBy.value] || 'avg_score'
+  const values = agentSortBy.value === 'total_score'
+    ? data.map(d => Math.round((d.avg_score || 0) * d.count))
+    : data.map(d => d[field])
+  const unit = dimUnitMap[agentSortBy.value] || '分'
 
   agentChart.setOption({
-    tooltip: { trigger: 'axis' },
+    tooltip: { trigger: 'axis', formatter: (params) => {
+      const p = params[0]
+      return `${p.name}<br/>${p.value}${unit}`
+    } },
     grid: { left: 60, right: 20, top: 20, bottom: 30 },
-    xAxis: { type: 'value', name: '平均分' },
+    xAxis: { type: 'value', name: dimLabelMap[agentSortBy.value] },
     yAxis: { type: 'category', data: names.reverse(), name: '坐席' },
     series: [{
       type: 'bar',
-      data: scores.reverse(),
+      data: values.reverse(),
       itemStyle: { color: '#409eff' },
-      label: { show: true, position: 'right', formatter: '{c}' }
+      label: { show: true, position: 'right', formatter: `{c}${unit}` }
     }]
   })
 }
@@ -378,14 +534,13 @@ function renderRuleChart(data) {
     return
   }
 
-  const top5 = data.slice(0, 5)
+  const top10 = data.slice(0, 10)
   ruleChart.setOption({
     tooltip: { trigger: 'item', formatter: '{b}: {c}次' },
-    legend: { orient: 'vertical', left: 'left' },
     series: [{
       type: 'pie',
       radius: ['40%', '70%'],
-      data: top5.map(d => ({ name: d.rule_name, value: d.hit_count }))
+      data: top10.map(d => ({ name: d.item_name, value: d.hit_count }))
     }]
   })
 }
@@ -532,6 +687,13 @@ onUnmounted(() => {
   font-weight: bold;
   font-size: 15px;
   color: #303133;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
 }
 
 .chart-container {

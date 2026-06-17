@@ -1,9 +1,9 @@
 """
 系统设置数据模型
 """
-from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime
 from backend.core.database import Base
+from backend.core.datetime_utils import get_current_time
 
 
 class SystemSettings(Base):
@@ -16,5 +16,5 @@ class SystemSettings(Base):
     description = Column(String(255), nullable=True, comment="配置描述")
     is_secret = Column(Boolean, default=False, comment="是否敏感信息（如密码、密钥）")
     is_system = Column(Boolean, default=False, comment="是否为系统级配置")
-    created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment="更新时间")
+    created_at = Column(DateTime, default=get_current_time, comment="创建时间")
+    updated_at = Column(DateTime, default=get_current_time, onupdate=get_current_time, comment="更新时间")

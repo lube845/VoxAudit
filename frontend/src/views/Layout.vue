@@ -68,6 +68,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Setting, Microphone, HomeFilled, Download, Delete, User } from '@element-plus/icons-vue'
+import { now, formatDate } from '@/utils/timezone'
 import api from '@/api'
 
 const route = useRoute()
@@ -86,15 +87,7 @@ function handleLogout() {
 }
 
 function updateTime() {
-  const now = new Date()
-  currentTime.value = now.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  })
+  currentTime.value = now().format('YYYY-MM-DD HH:mm:ss')
 }
 
 let timeInterval = null

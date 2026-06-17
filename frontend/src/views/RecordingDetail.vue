@@ -23,8 +23,6 @@
             <el-descriptions-item label="录音时长">{{ recording.duration ? `${Math.floor(recording.duration)}秒` : '-' }}</el-descriptions-item>
             <el-descriptions-item label="状态">
               <el-tag :type="getStatusType(recording.status)">{{ getStatusText(recording.status) }}</el-tag>
-              <el-button link type="warning" v-if="recording.status === 'transcribe_failed'" @click="retryTranscribe" style="margin-left: 8px">重试转写</el-button>
-              <el-button link type="warning" v-if="recording.status === 'score_failed'" @click="retryScore" style="margin-left: 8px">重试评分</el-button>
             </el-descriptions-item>
             <el-descriptions-item label="是否被否决">
               <el-tag :type="recording.is_rejected ? 'danger' : 'success'">
@@ -45,43 +43,17 @@
           </template>
            <el-descriptions :column="2" border>
             <el-descriptions-item label="加分总分">
-              <span style="color: #67c23a; font-weight: bold">+{{ scoringResult.bonus_score || 0 }}</span>
+              <span style="color: #67c23a; font-weight: bold">{{ scoringResult.bonus_score || 0 }}</span>
             </el-descriptions-item>
             <el-descriptions-item label="减分总分">
-              <span style="color: #f56c6c; font-weight: bold">-{{ scoringResult.deduction_score || 0 }}</span>
+              <span style="color: #f56c6c; font-weight: bold">{{ scoringResult.deduction_score || 0 }}</span>
             </el-descriptions-item>
             <el-descriptions-item label="总分" :span="2">
               <span :style="{ color: scoringResult.total_score >= 60 ? '#67c23a' : scoringResult.total_score < 0 ? '#f56c6c' : '' }" style="font-weight: bold">
-                {{ scoringResult.total_score }}
+                {{ scoringResult.total_score >= 0 ? '+' : '' }}{{ scoringResult.total_score }}
               </span>
             </el-descriptions-item>
           </el-descriptions>
-
-          <!-- 加分项目 -->
-          <div v-if="bonusItems.length > 0" style="margin-top: 16px">
-            <div style="font-weight: bold; margin-bottom: 8px">加分项目</div>
-            <el-table :data="bonusItems" stripe size="small">
-              <el-table-column prop="item_name" label="考核项" />
-              <el-table-column prop="score" label="得分" width="80">
-                <template #default="{ row }">
-                  <span style="color: #67c23a">+{{ row.score || 0 }}</span>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
-
-          <!-- 减分项目 -->
-          <div v-if="deductionItems.length > 0" style="margin-top: 16px">
-            <div style="font-weight: bold; margin-bottom: 8px">减分项目</div>
-            <el-table :data="deductionItems" stripe size="small">
-              <el-table-column prop="item_name" label="考核项" />
-              <el-table-column prop="score" label="扣分" width="80">
-                <template #default="{ row }">
-                  <span style="color: #f56c6c">-{{ Math.abs(row.score) }}</span>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
         </el-card>
       </el-col>
 
@@ -103,7 +75,7 @@
                 :class="{ 'agent': seg.speaker === 'agent', 'customer': seg.speaker !== 'agent' }"
               >
                 <div class="segment-speaker">
-                  {{ seg.speaker === 'agent' ? '坐席' : '客户' }}
+                  {{ getSpeakerLabel(seg.speaker) }}
                   <span class="segment-time">{{ formatTime(seg.start_time) }}</span>
                 </div>
                 <div class="segment-text" :class="getSegmentClass(seg)">
@@ -123,29 +95,48 @@
           <template #header>
             <span>评分明细</span>
           </template>
-          <el-table :data="scoringResult.details" stripe>
-            <el-table-column prop="item_name" label="考核项" />
-            <el-table-column prop="item_type" label="类型" width="60">
-              <template #default="{ row }">
-                <span class="type-bubble" :class="row.item_type === 'deduction' ? 'deduction' : 'bonus'">
-                  {{ row.item_type === 'deduction' ? '-' : '+' }}
-                </span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="status" label="状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="getDetailStatusType(row.status)">
-                  {{ getDetailStatusText(row.status) }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="score" label="得分" width="80">
-              <template #default="{ row }">
-                {{ row.score }}/{{ row.max_score }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="matched_text" label="匹配文本" show-overflow-tooltip />
-          </el-table>
+
+          <!-- 加分项目 -->
+          <div v-if="bonusItems.length > 0" style="margin-bottom: 16px">
+            <div style="font-weight: bold; margin-bottom: 8px">加分项目</div>
+            <el-table :data="bonusItems" stripe size="small">
+              <el-table-column prop="item_name" label="考核项" />
+              <el-table-column prop="score" label="得分" width="80">
+                <template #default="{ row }">
+                  <span style="color: #67c23a">{{ row.score || 0 }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="is_veto" label="是否否决项" width="100">
+                <template #default="{ row }">
+                  <el-tag v-if="row.is_veto" type="danger" size="small">是</el-tag>
+                  <span v-else style="color: #999">否</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="matched_text" label="匹配文本" show-overflow-tooltip />
+            </el-table>
+          </div>
+
+          <!-- 减分项目 -->
+          <div v-if="deductionItems.length > 0">
+            <div style="font-weight: bold; margin-bottom: 8px">减分项目</div>
+            <el-table :data="deductionItems" stripe size="small">
+              <el-table-column prop="item_name" label="考核项" />
+              <el-table-column prop="score" label="扣分" width="80">
+                <template #default="{ row }">
+                  <span style="color: #f56c6c">{{ Math.abs(row.score) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="is_veto" label="是否否决项" width="100">
+                <template #default="{ row }">
+                  <el-tag v-if="row.is_veto" type="danger" size="small">是</el-tag>
+                  <span v-else style="color: #999">否</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="matched_text" label="匹配文本" show-overflow-tooltip />
+            </el-table>
+          </div>
+
+          <el-empty v-if="bonusItems.length === 0 && deductionItems.length === 0" description="暂无命中的规则" />
         </el-card>
       </el-col>
     </el-row>
@@ -157,7 +148,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
-import dayjs from 'dayjs'
+import { formatDate } from '@/utils/timezone'
 import api from '@/api'
 
 const route = useRoute()
@@ -173,26 +164,35 @@ const transcriptSegments = computed(() => {
 
 const bonusItems = computed(() => {
   if (!scoringResult.value?.details) return []
-  return scoringResult.value.details.filter(d => d.item_type === 'bonus')
+  return scoringResult.value.details
+    .filter(d => d.item_type === 'bonus' && d.status === 'matched')
+    .sort((a, b) => b.score - a.score)
 })
 
 const deductionItems = computed(() => {
   if (!scoringResult.value?.details) return []
-  return scoringResult.value.details.filter(d => d.item_type === 'deduction')
+  return scoringResult.value.details
+    .filter(d => d.item_type === 'deduction' && d.status === 'matched')
+    .sort((a, b) => Math.abs(b.score) - Math.abs(a.score))
 })
 
 function goBack() {
   router.back()
 }
 
-function formatDate(date) {
-  return date ? dayjs(date).format('YYYY-MM-DD HH:mm:ss') : '-'
-}
-
 function formatTime(seconds) {
   const m = Math.floor(seconds / 60)
   const s = Math.floor(seconds % 60)
   return `${m}:${s.toString().padStart(2, '0')}`
+}
+
+function getSpeakerLabel(speaker) {
+  if (speaker === 'agent') return '坐席'
+  if (speaker && speaker.startsWith('customer_')) {
+    const num = speaker.replace('customer_', '')
+    return `客户${num}`
+  }
+  return '客户'
 }
 
 function getStatusType(status) {
@@ -223,15 +223,6 @@ function getStatusText(status) {
   return texts[status] || status
 }
 
-function getDetailStatusType(status) {
-  const types = { done: 'success', not_done: 'info', wrong: 'danger' }
-  return types[status] || 'info'
-}
-
-function getDetailStatusText(status) {
-  const texts = { done: '已做到', not_done: '未做到', wrong: '做错' }
-  return texts[status] || status
-}
 
 function getSegmentClass(seg) {
   if (!seg.text || !scoringResult.value?.details) {
@@ -246,66 +237,38 @@ function getSegmentClass(seg) {
   return ''
 }
 
-function copyText() {
-  const text = transcriptSegments.value.map(s => s.text).join('\n')
-  if (!text && recording.value?.transcript) {
-    navigator.clipboard.writeText(recording.value.transcript)
-  } else {
-    navigator.clipboard.writeText(text)
+async function copyText() {
+  const text = transcriptSegments.value.map(s => {
+    const speaker = getSpeakerLabel(s.speaker)
+    return `${speaker}: ${s.text}`
+  }).join('\n')
+  const textToCopy = text || recording.value?.transcript || ''
+  if (!textToCopy) {
+    ElMessage.warning('没有可复制的文本')
+    return
   }
-  ElMessage.success('已复制到剪贴板')
-}
-
-async function retryTranscribe() {
   try {
-    await api.recording.retryTranscribe(recording.value.id)
-    ElMessage.success('已重新触发转写')
-    recording.value.status = 'transcribing'
+    await navigator.clipboard.writeText(textToCopy)
+    ElMessage.success('已复制到剪贴板')
   } catch (e) {
-    ElMessage.error('重试转写失败')
-  }
-}
-
-async function handleRetry() {
-  if (recording.value.status === 'transcribe_failed') {
-    retryTranscribe()
-  } else {
-    retryScore()
-  }
-}
-
-async function retryScore() {
-  try {
-    await api.recording.retryScore(recording.value.id)
-    ElMessage.success('已重新触发评分')
-    recording.value.status = 'scoring'
-    // 轮询等待评分完成
-    pollScoringResult()
-  } catch (e) {
-    ElMessage.error('重试评分失败')
-  }
-}
-
-async function pollScoringResult() {
-  const maxAttempts = 30
-  const interval = 3000
-  for (let i = 0; i < maxAttempts; i++) {
-    await new Promise(resolve => setTimeout(resolve, interval))
+    // 降级方案：使用传统方式复制
+    const textarea = document.createElement('textarea')
+    textarea.value = textToCopy
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.select()
     try {
-      const id = route.params.id
-      const recData = await api.recording.get(id)
-      recording.value = recData
-      if (recData.scoring_results && recData.scoring_results.length > 0) {
-        scoringResult.value = recData.scoring_results[0]
-      }
-      if (recData.status === 'scored' || recData.status === 'score_failed') {
-        break
-      }
-    } catch (e) {
-      console.error(e)
+      document.execCommand('copy')
+      ElMessage.success('已复制到剪贴板')
+    } catch (e2) {
+      ElMessage.error('复制失败，请手动复制')
+    } finally {
+      document.body.removeChild(textarea)
     }
   }
 }
+
 
 async function exportReport() {
   try {
@@ -337,7 +300,7 @@ async function loadData() {
   } catch (e) {
     console.error(e)
   }
-   // 兼容单独调用 score 接口的方式（如果 scoring_results 为空）
+  // 兼容单独调用 score 接口的方式（如果 scoring_results 为空）
   if (!scoringResult.value) {
     try {
       const id = route.params.id

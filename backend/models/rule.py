@@ -1,12 +1,12 @@
 """
 评分规则相关数据模型
 """
-from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime, Text, Float, ForeignKey
 )
 
 from backend.core.database import Base
+from backend.core.datetime_utils import get_current_time
 
 
 class ScoringRule(Base):
@@ -32,6 +32,6 @@ class ScoringRule(Base):
     user_id = Column(String(50), nullable=True, index=True, comment="所属用户loginid")
 
     remark = Column(Text, nullable=True, comment="备注")
-    created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment="更新时间")
+    created_at = Column(DateTime, default=get_current_time, comment="创建时间")
+    updated_at = Column(DateTime, default=get_current_time, onupdate=get_current_time, comment="更新时间")
     published_at = Column(DateTime, nullable=True, comment="发布时间")

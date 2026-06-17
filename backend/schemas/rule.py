@@ -10,7 +10,7 @@ class ScoringRuleBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     code: str = Field(..., min_length=1, max_length=50)
     version: str = Field(..., min_length=1, max_length=20)
-    description: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=500)
     total_score: float = 100.0
     rule_type: str = "bonus"
     is_veto: bool = False

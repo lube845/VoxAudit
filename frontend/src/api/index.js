@@ -81,6 +81,10 @@ export default {
         delete filtered.score_operator
         delete filtered.score_value
       }
+      // is_rejected 为空字符串时删除，避免 FastAPI bool 类型解析错误
+      if (filtered.is_rejected === '' || filtered.is_rejected === null) {
+        delete filtered.is_rejected
+      }
       return request.get('/recordings', { params: filtered })
     },
     get: (id) => request.get(`/recordings/${id}`),
@@ -90,11 +94,7 @@ export default {
     }),
     delete: (id) => request.delete(`/recordings/${id}`),
     getScore: (id) => request.get(`/recordings/${id}/score`),
-    triggerTranscribe: (id) => request.post(`/recordings/${id}/transcribe`),
-    triggerScore: (id) => request.post(`/recordings/${id}/score`),
     getPlayUrl: (id) => request.get(`/recordings/${id}/play`),
-    retryTranscribe: (id) => request.post(`/recordings/${id}/transcribe`),
-    retryScore: (id) => request.post(`/recordings/${id}/score`),
   },
 
   statistics: {
@@ -102,6 +102,7 @@ export default {
     trend: (days) => request.get('/statistics/trend', { params: { days } }),
     agentStats: (params) => request.get('/statistics/agent-stats', { params }),
     ruleStats: (params) => request.get('/statistics/rule-stats', { params }),
+    ruleHitStats: (params) => request.get('/statistics/rule-hit-stats', { params }),
   },
 
   export: {
@@ -126,6 +127,5 @@ export default {
     getOverview: (params) => request.get('/statistics/users/overview', { params }),
     getUsersList: (params) => request.get('/statistics/users/list', { params }),
     getUserDetail: (loginid, params) => request.get(`/statistics/users/${loginid}/detail`, { params }),
-    getLeaderboard: (params) => request.get('/statistics/users/leaderboard', { params }),
   }
 }

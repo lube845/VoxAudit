@@ -2,7 +2,7 @@
 录音管理路由
 """
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete
@@ -11,6 +11,7 @@ import logging
 
 from backend.core.database import get_db, AsyncSessionLocal
 from backend.core.config import settings
+from backend.core.datetime_utils import get_timezone
 from backend.models.recording import Recording, RecordingStatus, TranscriptSegment, ScoringResult
 from backend.models.rule import ScoringRule
 from backend.schemas.recording import (
@@ -24,6 +25,39 @@ from backend.api.auth import get_current_user_required
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/recordings", tags=["录音管理"])
+
+# 按用户分组的并发控制信号量管理器
+class UserSemaphoreManager:
+    """每个用户独立的信号量管理器，实现按账号隔离的并发控制"""
+
+    def __init__(self, max_concurrency: int):
+        self._semaphores: dict[str, asyncio.Semaphore] = {}
+        self._lock = asyncio.Lock()
+        self._max_concurrency = max_concurrency
+
+    async def get_semaphore(self, user_id: str) -> asyncio.Semaphore:
+        """获取指定用户的信号量，不存在则创建"""
+        if user_id not in self._semaphores:
+            async with self._lock:
+                # 二次检查避免重复创建
+                if user_id not in self._semaphores:
+                    self._semaphores[user_id] = asyncio.Semaphore(self._max_concurrency)
+        return self._semaphores[user_id]
+
+    async def release_user(self, user_id: str):
+        """释放用户的所有信号量资源（当用户长期无活动时调用）"""
+        async with self._lock:
+            if user_id in self._semaphores:
+                del self._semaphores[user_id]
+
+
+# 按用户分组的并发控制信号量（ASR转写和LLM评分独立控制）
+asr_semaphore_manager = UserSemaphoreManager(settings.MAX_RETRY_CONCURRENCY)
+llm_semaphore_manager = UserSemaphoreManager(settings.MAX_LLM_CONCURRENCY)
+
+# 全局并发控制信号量（所有用户共享）
+global_asr_semaphore = asyncio.Semaphore(settings.MAX_GLOBAL_ASR_CONCURRENCY)
+global_llm_semaphore = asyncio.Semaphore(settings.MAX_GLOBAL_LLM_CONCURRENCY)
 
 
 @router.post("/init-upload")
@@ -116,18 +150,40 @@ async def upload_file(
     await db.commit()
 
     # 触发异步转写
-    asyncio.create_task(transcribe_recording_bg(recording_id))
+    asyncio.create_task(transcribe_recording_bg(recording_id, user_id))
 
     return {"message": "上传成功", "recording_id": recording_id}
 
 
-async def transcribe_recording_bg(recording_id: int):
+async def transcribe_recording_bg(
+    recording_id: int,
+    user_id: str,
+    asr_sem: Optional[asyncio.Semaphore] = None,
+    llm_sem: Optional[asyncio.Semaphore] = None
+):
     """后台转写录音"""
-    async with AsyncSessionLocal() as db:
-        await _transcribe_impl(recording_id, db)
+    # 如果没有传入信号量，从用户管理器获取
+    if asr_sem is None:
+        asr_sem = await asr_semaphore_manager.get_semaphore(user_id)
+    if llm_sem is None:
+        llm_sem = await llm_semaphore_manager.get_semaphore(user_id)
+
+    async def _do_transcribe():
+        async with AsyncSessionLocal() as db:
+            await _transcribe_impl(recording_id, db, asr_sem, llm_sem)
+
+    # 全局限制在外层，用户限制在内层
+    async with global_asr_semaphore:
+        async with asr_sem:
+            await _do_transcribe()
 
 
-async def _transcribe_impl(recording_id: int, db: AsyncSession):
+async def _transcribe_impl(
+    recording_id: int,
+    db: AsyncSession,
+    asr_sem: Optional[asyncio.Semaphore] = None,
+    llm_sem: Optional[asyncio.Semaphore] = None
+):
     """转写录音实现"""
     result = await db.execute(select(Recording).where(Recording.id == recording_id))
     recording = result.scalar_one_or_none()
@@ -138,15 +194,31 @@ async def _transcribe_impl(recording_id: int, db: AsyncSession):
     await db.commit()
 
     try:
-        # 从OSS获取文件内容
-        file_content = await oss_service.get_file(recording.oss_object_key)
+        # 步骤1: 从OSS获取文件内容
+        if not recording.oss_object_key:
+            recording.status = RecordingStatus.TRANSCRIBE_FAILED
+            recording.remark = "[步骤1/4] 错误: oss_object_key为空"
+            await db.commit()
+            return
 
-        # 调用ASR转写
+        recording.remark = "[步骤1/4] 正在从OSS获取文件..."
+        await db.commit()
+        file_content = await oss_service.get_file(recording.oss_object_key)
+        recording.remark = f"[步骤1/4] OSS文件大小: {len(file_content)} bytes"
+        await db.commit()
+
+        # 步骤2: 调用ASR转写
+        recording.remark = "[步骤2/4] 正在调用ASR转写..."
+        await db.commit()
         transcript_result = await asr_service.transcribe_with_role(
             file_content, recording.file_name
         )
+        recording.remark = f"[步骤2/4] ASR返回keys: {list(transcript_result.keys())}"
+        await db.commit()
 
-        # 保存转写结果
+        # 步骤3: 保存转写结果
+        recording.remark = "[步骤3/4] 正在保存转写结果..."
+        await db.commit()
         recording.transcript = transcript_result.get("full_text", "")
 
         # 保存转写片段到 TranscriptSegment 表
@@ -172,112 +244,139 @@ async def _transcribe_impl(recording_id: int, db: AsyncSession):
             recording.duration = last_seg.get("end_time")
 
         recording.status = RecordingStatus.TRANSCRIBED
+        recording.remark = f"[步骤3/4] 转写完成, 文本长度: {len(recording.transcript)}, 片段数: {len(segments_data)}"
         await db.commit()
 
-        # 转写完成后自动触发评分
-        asyncio.create_task(auto_score_recording(recording_id))
+        # 步骤4: 转写完成后自动触发评分
+        recording.remark = "[步骤4/4] 正在触发自动评分..."
+        await db.commit()
+        asyncio.create_task(auto_score_recording(recording_id, llm_sem, recording.user_id))
 
     except Exception as e:
-        logger.error(f"转写失败: {e}")
+        import traceback
+        error_detail = f"[转写失败] 步骤: {recording.remark}\n输入: oss_key={recording.oss_object_key}, file_name={recording.file_name}\n错误: {str(e)}\n堆栈: {traceback.format_exc()[:500]}"
+        recording.remark = error_detail
         recording.status = RecordingStatus.TRANSCRIBE_FAILED
         await db.commit()
+        logger.error(error_detail)
 
 
-async def auto_score_recording(recording_id: int):
+async def auto_score_recording(recording_id: int, semaphore: Optional[asyncio.Semaphore] = None, user_id: Optional[str] = None):
     """自动评分录音"""
-    logger.info(f"[评分] 开始自动评分 recording_id={recording_id}")
-    async with AsyncSessionLocal() as db:
-        try:
-            result = await db.execute(select(Recording).where(Recording.id == recording_id))
-            recording = result.scalar_one_or_none()
-            if not recording:
-                logger.warning(f"[评分] 录音不存在 recording_id={recording_id}")
-                return
+    # 如果没有传入信号量，从用户管理器获取
+    if semaphore is None and user_id:
+        semaphore = await llm_semaphore_manager.get_semaphore(user_id)
 
-            logger.info(f"[评分] 录音状态={recording.status}, 转写文本长度={len(recording.transcript or '')}")
-
-            # 获取该用户所有最新版本且已启用的规则
-            rules_result = await db.execute(
-                select(ScoringRule).where(
-                    ScoringRule.is_latest == True,
-                    ScoringRule.is_enabled == True,
-                    ScoringRule.user_id == recording.user_id,
-                )
-            )
-            rules = list(rules_result.scalars().all())
-
-            logger.info(f"[评分] 找到 {len(rules)} 条规则")
-
-            if not rules:
-                logger.warning(f"[评分] 没有找到规则，跳过评分: recording_id={recording_id}")
-                return
-
-            recording.status = RecordingStatus.SCORING
-            await db.commit()
-            logger.info(f"[评分] 已更新状态为 SCORING")
-
-            # 分别对每个规则进行评分
-            total_bonus = 0
-            total_deduction = 0
-            all_details = []
-            has_veto = False  # 初始化否决标记
-
-            for rule in rules:
-                logger.info(f"[评分] 开始评分规则 id={rule.id}, name={rule.name}, code={rule.code}")
-                # 调用AI评分
-                scoring_result = await ai_scoring_service.score(
-                    transcript=recording.transcript or "",
-                    segments=recording.transcript_segments or [],
-                    rule=rule,
-                )
-                logger.info(f"[评分] 规则评分完成 id={rule.id}, bonus={scoring_result.get('bonus_score', 0)}, deduction={scoring_result.get('deduction_score', 0)}, is_rejected={scoring_result.get('is_rejected', False)}")
-                total_bonus += scoring_result.get("bonus_score", 0)
-                total_deduction += scoring_result.get("deduction_score", 0)
-                all_details.extend(scoring_result.get("details", []))
-                # 追踪是否有否决项被命中
-                if scoring_result.get("is_rejected", False):
-                    has_veto = True
-
-            # 计算总分（允许负分）
-            final_score = total_bonus - total_deduction
-
-            # 保存评分结果
-            result_record = ScoringResult(
-                recording_id=recording.id,
-                rule_ids=[rule.id for rule in rules],  # 存储所有参与评分的规则ID
-                total_score=final_score,
-                bonus_score=total_bonus,
-                deduction_score=total_deduction,
-                scoring_details=all_details,
-                is_auto_scored=True,
-                is_rejected=has_veto,
-            )
-            db.add(result_record)
-
-            # 更新录音评分信息
-            recording.total_score = final_score
-            recording.bonus_score = total_bonus
-            recording.deduction_score = total_deduction
-            recording.rule_version = rules[0].version if rules else None
-            recording.status = RecordingStatus.SCORED
-
-            await db.commit()
-
-        except Exception as e:
-            logger.error(f"[评分] 自动评分失败: recording_id={recording_id}, error={e}")
-            import traceback
-            traceback.print_exc()
+    async def _do_score():
+        logger.info(f"[评分] 开始自动评分 recording_id={recording_id}")
+        async with AsyncSessionLocal() as db:
             try:
-                # 重新获取recording对象
                 result = await db.execute(select(Recording).where(Recording.id == recording_id))
                 recording = result.scalar_one_or_none()
-                if recording:
-                    recording.status = RecordingStatus.SCORE_FAILED
-                    recording.remark = f"评分失败: {str(e)}"
+                if not recording:
+                    logger.warning(f"[评分] 录音不存在 recording_id={recording_id}")
+                    return
+
+                logger.info(f"[评分] 录音状态={recording.status}, 转写文本长度={len(recording.transcript or '')}")
+
+                # 步骤1: 获取评分规则
+                recording.remark = "[评分步骤1/5] 正在获取评分规则..."
+                await db.commit()
+                rules_result = await db.execute(
+                    select(ScoringRule).where(
+                        ScoringRule.is_latest == True,
+                        ScoringRule.is_enabled == True,
+                        ScoringRule.user_id == recording.user_id,
+                    )
+                )
+                rules = list(rules_result.scalars().all())
+                recording.remark = f"[评分步骤1/5] 找到 {len(rules)} 条规则"
+                await db.commit()
+
+                logger.info(f"[评分] 找到 {len(rules)} 条规则")
+
+                if not rules:
+                    logger.warning(f"[评分] 没有找到规则，跳过评分: recording_id={recording_id}")
+                    return
+
+                # 步骤2: 更新状态为评分中
+                recording.status = RecordingStatus.SCORING
+                recording.remark = "[评分步骤2/5] 开始评分..."
+                await db.commit()
+                logger.info(f"[评分] 已更新状态为 SCORING")
+
+                # 步骤3: 对每个规则进行评分
+                total_bonus = 0
+                total_deduction = 0
+                all_details = []
+                has_veto = False  # 初始化否决标记
+
+                for i, rule in enumerate(rules):
+                    step_remark = f"[评分步骤3/5] 正在评分规则 {i+1}/{len(rules)}: {rule.name}({rule.code})"
+                    recording.remark = step_remark
                     await db.commit()
-                    logger.info(f"[评分] 已更新状态为 SCORE_FAILED, remark={recording.remark}")
-            except Exception as commit_err:
-                logger.error(f"[评分] 更新状态失败: {commit_err}")
+                    logger.info(f"[评分] {step_remark}")
+
+                    # 调用AI评分
+                    scoring_result = await ai_scoring_service.score(
+                        transcript=recording.transcript or "",
+                        segments=recording.transcript_segments or [],
+                        rule=rule,
+                    )
+                    logger.info(f"[评分] 规则评分完成 id={rule.id}, bonus={scoring_result.get('bonus_score', 0)}, deduction={scoring_result.get('deduction_score', 0)}, is_rejected={scoring_result.get('is_rejected', False)}")
+                    total_bonus += scoring_result.get("bonus_score", 0)
+                    total_deduction += scoring_result.get("deduction_score", 0)
+                    all_details.extend(scoring_result.get("details", []))
+                    # 追踪是否有否决项被命中
+                    if scoring_result.get("is_rejected", False):
+                        has_veto = True
+
+                # 步骤4: 计算并保存评分结果
+                final_score = total_bonus - total_deduction
+                recording.remark = f"[评分步骤4/5] 计算总分: bonus={total_bonus}, deduction={total_deduction}, final={final_score}"
+                await db.commit()
+
+                # 保存评分结果前，先删除该录音的旧评分结果
+                await db.execute(delete(ScoringResult).where(ScoringResult.recording_id == recording.id))
+
+                # 保存评分结果
+                result_record = ScoringResult(
+                    recording_id=recording.id,
+                    rule_ids=[rule.id for rule in rules],  # 存储所有参与评分的规则ID
+                    total_score=final_score,
+                    bonus_score=total_bonus,
+                    deduction_score=total_deduction,
+                    scoring_details=all_details,
+                    is_auto_scored=True,
+                    is_rejected=has_veto,
+                )
+                db.add(result_record)
+
+                # 步骤5: 更新录音评分信息
+                recording.total_score = final_score
+                recording.bonus_score = total_bonus
+                recording.deduction_score = total_deduction
+                recording.rule_version = rules[0].version if rules else None
+                recording.status = RecordingStatus.SCORED
+                recording.remark = "无"  # 评分成功后清空备注
+
+                await db.commit()
+
+            except Exception as e:
+                import traceback
+                error_detail = f"[评分失败] 步骤: {recording.remark}\n输入: transcript长度={len(recording.transcript or '')}, segments数量={len(recording.transcript_segments or [])}\n错误: {str(e)}\n堆栈: {traceback.format_exc()[:800]}"
+                recording.remark = error_detail
+                recording.status = RecordingStatus.SCORE_FAILED
+                await db.commit()
+                logger.error(error_detail)
+
+    if semaphore:
+        # 全局限制在外层，用户限制在内层
+        async with global_llm_semaphore:
+            async with semaphore:
+                await _do_score()
+    else:
+        await _do_score()
 
 
 @router.delete("/{recording_id}")
@@ -332,6 +431,7 @@ async def list_recordings(
     score_dimension: Optional[str] = None,
     score_operator: Optional[str] = None,
     score_value: Optional[float] = None,
+    is_rejected: Optional[bool] = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -356,13 +456,20 @@ async def list_recordings(
     if start_date:
         try:
             start_dt = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S')
+            # Make timezone-aware using TZ env var
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo(get_timezone())
+            start_dt = start_dt.replace(tzinfo=tz)
             query = query.where(Recording.created_at >= start_dt)
         except ValueError:
             pass
     if end_date:
         try:
-            end_dt = datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S')
-            query = query.where(Recording.created_at <= end_dt)
+            end_dt = datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S') + timedelta(days=1)
+            from zoneinfo import ZoneInfo
+            tz = ZoneInfo(get_timezone())
+            end_dt = end_dt.replace(tzinfo=tz)
+            query = query.where(Recording.created_at < end_dt)
         except ValueError:
             pass
 
@@ -375,10 +482,30 @@ async def list_recordings(
         }
         column = column_map.get(score_dimension)
         if column is not None:
-            if score_operator == "gte":
+            if score_operator == "gt":
+                query = query.where(column > score_value)
+            elif score_operator == "gte":
                 query = query.where(column >= score_value)
+            elif score_operator == "eq":
+                query = query.where(column == score_value)
             elif score_operator == "lte":
                 query = query.where(column <= score_value)
+            elif score_operator == "lt":
+                query = query.where(column < score_value)
+
+    # 是否否决筛选（只筛选有评分记录的录音）
+    if is_rejected is not None:
+        from sqlalchemy import exists
+        logger.info(f"[列表] is_rejected 筛选条件: {is_rejected}, 类型: {type(is_rejected)}")
+        # 必须有评分记录，且 is_rejected 值匹配
+        has_score_with_status = (
+            select(ScoringResult.id)
+            .where(ScoringResult.recording_id == Recording.id)
+            .where(ScoringResult.is_rejected == is_rejected)
+            .exists()
+        )
+        query = query.where(has_score_with_status)
+        logger.info(f"[列表] 筛选 SQL 构建完成")
 
     # 获取总数
     count_query = select(func.count()).select_from(query.subquery())
@@ -477,6 +604,7 @@ async def get_recording(
                     "score": d.get("score", 0),
                     "max_score": d.get("max_score", 0),
                     "matched_text": d.get("matched_text"),
+                    "is_veto": d.get("is_veto", False),
                 })
 
         scoring_results.append({
@@ -499,11 +627,26 @@ async def get_recording(
     # 获取是否被否决（是否命中否决规则）
     is_rejected = getattr(scoring, 'is_rejected', False) if scoring else False
 
+    # 构建响应数据，避免直接使用 recording.__dict__（包含未定义的字段如 oss_object_key, user_id 等）
     return {
-        **recording.__dict__,
+        "id": recording.id,
+        "file_name": recording.file_name,
+        "file_size": recording.file_size,
+        "file_type": recording.file_type,
+        "status": recording.status.value if hasattr(recording.status, 'value') else recording.status,
+        "duration": recording.duration,
+        "transcript": recording.transcript,
+        "total_score": recording.total_score,
+        "bonus_score": recording.bonus_score or 0,
+        "deduction_score": recording.deduction_score or 0,
+        "agent_name": recording.agent_name,
+        "customer_phone": recording.customer_phone,
+        "remark": recording.remark,
+        "created_at": recording.created_at,
+        "updated_at": recording.updated_at,
+        "is_rejected": is_rejected,
         "transcript_segments": recording.transcript_segments or [],
         "scoring_results": scoring_results,
-        "is_rejected": is_rejected,
     }
 
 
@@ -549,56 +692,6 @@ async def get_scoring_result(
         "user_id": scoring.user_id,
         "created_at": scoring.created_at,
     }
-
-
-@router.post("/{recording_id}/transcribe")
-async def trigger_transcribe(
-    recording_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user_required)
-):
-    """手动触发转写"""
-    user_id = current_user.get("loginid", "admin")
-    result = await db.execute(
-        select(Recording).where(
-            Recording.id == recording_id,
-            Recording.user_id == user_id
-        )
-    )
-    recording = result.scalar_one_or_none()
-    if not recording:
-        raise HTTPException(status_code=404, detail="录音不存在")
-
-    if recording.status != RecordingStatus.UPLOADED:
-        raise HTTPException(status_code=400, detail="录音状态不正确")
-
-    asyncio.create_task(transcribe_recording_bg(recording_id))
-    return {"message": "转写任务已触发"}
-
-
-@router.post("/{recording_id}/score")
-async def trigger_scoring(
-    recording_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_user_required)
-):
-    """手动触发评分"""
-    user_id = current_user.get("loginid", "admin")
-    result = await db.execute(
-        select(Recording).where(
-            Recording.id == recording_id,
-            Recording.user_id == user_id
-        )
-    )
-    recording = result.scalar_one_or_none()
-    if not recording:
-        raise HTTPException(status_code=404, detail="录音不存在")
-
-    if recording.status not in [RecordingStatus.TRANSCRIBED, RecordingStatus.SCORE_FAILED]:
-        raise HTTPException(status_code=400, detail="录音未完成转写")
-
-    asyncio.create_task(auto_score_recording(recording_id))
-    return {"message": "评分任务已触发"}
 
 
 @router.get("/{recording_id}/play")

@@ -29,8 +29,6 @@ services:
     container_name: voxaudit_backend
     env_file:
       - .env
-    environment:
-      - PYTHONPATH=/workspace
     working_dir: /workspace
     ports:
       - "${BACKEND_EXTERNAL_PORT:-8000}:8000"
@@ -49,9 +47,6 @@ services:
   minio:
     image: minio/minio:latest
     container_name: voxaudit_minio
-    environment:
-      MINIO_ROOT_USER: ${OSS_ACCESS_KEY:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${OSS_SECRET_KEY:-minioadmin}
     volumes:
       - minio_data:/data
     ports:
@@ -72,6 +67,8 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.frontend
     container_name: voxaudit_frontend
+    env_file:
+      - .env
     ports:
       - "${FRONTEND_EXTERNAL_PORT:-8888}:80"
     networks:

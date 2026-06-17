@@ -1,35 +1,5 @@
 <template>
   <div class="user-stats-container">
-    <!-- 时间筛选 -->
-    <el-card class="filter-card">
-      <el-form :inline="true">
-        <el-form-item label="开始日期">
-          <el-date-picker
-            v-model="filter.startDate"
-            type="date"
-            placeholder="选择开始日期"
-            format="YYYY-MM-DD"
-            value-format="YYYY-MM-DD"
-            clearable
-          />
-        </el-form-item>
-        <el-form-item label="结束日期">
-          <el-date-picker
-            v-model="filter.endDate"
-            type="date"
-            placeholder="选择结束日期"
-            format="YYYY-MM-DD"
-            value-format="YYYY-MM-DD"
-            clearable
-          />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleFilter">查询</el-button>
-          <el-button @click="handleReset">重置</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
     <!-- 概览统计 -->
     <el-row :gutter="20" class="overview-row" v-loading="loading">
       <el-col :span="6">
@@ -58,89 +28,50 @@
       </el-col>
     </el-row>
 
-    <el-tabs v-model="activeTab" class="stats-tabs">
-      <!-- 用户列表 -->
-      <el-tab-pane label="用户列表" name="users">
-        <el-card>
-          <template #header>
-            <div class="card-header">
-              <span>用户使用情况</span>
-            </div>
+    <el-card>
+      <template #header>
+        <div class="card-header">
+          <span>用户使用情况</span>
+        </div>
+      </template>
+
+      <el-table :data="usersList" stripe border v-loading="loading">
+        <el-table-column type="index" label="排名" width="80" />
+        <el-table-column prop="loginid" label="工号" width="120" />
+        <el-table-column prop="name" label="姓名" width="120" />
+        <el-table-column prop="department" label="部门" width="150" />
+        <el-table-column prop="total_recordings" label="录音数" width="100" sortable />
+        <el-table-column prop="scored_recordings" label="已评分" width="100" sortable />
+        <el-table-column prop="avg_score" label="平均分" width="100" sortable>
+          <template #default="{ row }">
+            <span :class="getScoreClass(row.avg_score)">{{ row.avg_score || '-' }}</span>
           </template>
-
-          <el-table :data="usersList" stripe border v-loading="loading">
-            <el-table-column prop="loginid" label="工号" width="120" />
-            <el-table-column prop="name" label="姓名" width="120" />
-            <el-table-column prop="department" label="部门" width="150" />
-            <el-table-column prop="total_recordings" label="录音数" width="100" sortable />
-            <el-table-column label="平均分" width="100" sortable>
-              <template #default="{ row }">
-                <span :class="getScoreClass(row.avg_score)">{{ row.avg_score || '-' }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="总时长" width="120">
-              <template #default="{ row }">
-                {{ formatDuration(row.total_duration) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="存储" width="120">
-              <template #default="{ row }">
-                {{ formatSize(row.total_storage_bytes) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="通过率" width="100">
-              <template #default="{ row }">
-                {{ calcPassRate(row) }}%
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="120" fixed="right">
-              <template #default="{ row }">
-                <el-button type="primary" size="small" link @click="showUserDetail(row)">
-                  详情
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-      </el-tab-pane>
-
-      <!-- 排行榜 -->
-      <el-tab-pane label="排行榜" name="leaderboard">
-        <el-card>
-          <template #header>
-            <div class="card-header">
-              <span>用户排行榜</span>
-              <el-radio-group v-model="leaderboardSort" size="small">
-                <el-radio-button value="avg_score">按平均分</el-radio-button>
-                <el-radio-button value="total_recordings">按录音数</el-radio-button>
-                <el-radio-button value="total_score">按总分</el-radio-button>
-              </el-radio-group>
-            </div>
+        </el-table-column>
+        <el-table-column prop="total_score" label="总分" width="120" sortable />
+        <el-table-column label="总时长" width="120">
+          <template #default="{ row }">
+            {{ formatDuration(row.total_duration) }}
           </template>
-
-          <el-table :data="leaderboard" stripe border v-loading="loading">
-            <el-table-column type="index" label="排名" width="80" />
-            <el-table-column prop="loginid" label="工号" width="120" />
-            <el-table-column prop="name" label="姓名" width="120" />
-            <el-table-column prop="total_recordings" label="录音数" width="100" sortable />
-            <el-table-column prop="scored_recordings" label="已评分" width="100" sortable />
-            <el-table-column prop="avg_score" label="平均分" width="100" sortable>
-              <template #default="{ row }">
-                <span :class="getScoreClass(row.avg_score)">{{ row.avg_score }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="total_score" label="总分" width="120" sortable />
-            <el-table-column label="操作" width="100" fixed="right">
-              <template #default="{ row }">
-                <el-button type="primary" size="small" link @click="showUserDetail(row)">
-                  详情
-                </el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-      </el-tab-pane>
-    </el-tabs>
+        </el-table-column>
+        <el-table-column label="存储" width="120">
+          <template #default="{ row }">
+            {{ formatSize(row.total_storage_bytes) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="通过率" width="100">
+          <template #default="{ row }">
+            {{ calcPassRate(row) }}%
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="120" fixed="right">
+          <template #default="{ row }">
+            <el-button type="primary" size="small" link @click="showUserDetail(row)">
+              详情
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
 
     <!-- 用户详情弹窗 -->
     <el-dialog v-model="detailVisible" title="用户详情" width="900px" destroy-on-close>
@@ -150,8 +81,8 @@
           <el-descriptions-item label="姓名">{{ currentUser.name }}</el-descriptions-item>
           <el-descriptions-item label="部门">{{ currentUser.department }}</el-descriptions-item>
           <el-descriptions-item label="规则总数">{{ currentUser.total_rules }}</el-descriptions-item>
-          <el-descriptions-item label="活跃规则">{{ currentUser.active_rules }}</el-descriptions-item>
-          <el-descriptions-item label="最新规则版本">{{ currentUser.latest_rule_version || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="启用规则">{{ currentUser.active_rules }}</el-descriptions-item>
+          <el-descriptions-item label="最近评分时间">{{ currentUser.latest_scoring_time ? new Date(currentUser.latest_scoring_time).toLocaleString() : '-' }}</el-descriptions-item>
         </el-descriptions>
 
         <el-divider />
@@ -222,7 +153,11 @@
         <div class="score-distribution">
           <div class="section-title">分数分布</div>
           <el-table :data="currentUser.score_distribution" stripe size="small">
-            <el-table-column prop="label" label="分数段" width="120" />
+            <el-table-column prop="label" label="分数段" width="140">
+              <template #default="{ row }">
+                {{ formatScoreLabel(row.label) }}
+              </template>
+            </el-table-column>
             <el-table-column prop="count" label="录音数" width="120" />
             <el-table-column prop="percentage" label="占比">
               <template #default="{ row }">
@@ -233,9 +168,9 @@
         </div>
 
         <div v-if="currentUser.recordings_timeline && currentUser.recordings_timeline.length" class="timeline-section">
-          <div class="section-title">录音时间线</div>
+          <div class="section-title">近30个使用日期</div>
           <div class="timeline-chart">
-            <div v-for="item in currentUser.recordings_timeline.slice(-30)" :key="item.date" class="timeline-item">
+            <div v-for="item in currentUser.recordings_timeline.slice(0, 30)" :key="item.date" class="timeline-item">
               <div class="timeline-date">{{ item.date }}</div>
               <div class="timeline-count">{{ item.count }}</div>
             </div>
@@ -247,18 +182,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '@/api'
 
 const loading = ref(false)
-const activeTab = ref('users')
-const leaderboardSort = ref('avg_score')
-
-const filter = ref({
-  startDate: '',
-  endDate: ''
-})
 
 const overview = ref({
   total_users: 0,
@@ -269,7 +197,6 @@ const overview = ref({
 })
 
 const usersList = ref([])
-const leaderboard = ref([])
 const detailVisible = ref(false)
 const currentUser = ref(null)
 
@@ -302,13 +229,28 @@ function getScoreClass(score) {
   return 'score-low'
 }
 
+function formatScoreLabel(label) {
+  const labelMap = {
+    '<0': '(-∞, 0)',
+    '0-60': '[0, 60)',
+    '60-70': '[60, 70)',
+    '70-80': '[70, 80)',
+    '80-90': '[80, 90)',
+    '90-100': '[90, 100)',
+    '>100': '[100, +∞)'
+  }
+  return labelMap[label] || label
+}
+
 function getScoreColor(label) {
   const colors = {
+    '<0': '#F56C6C',
     '0-60': '#F56C6C',
     '60-70': '#E6A23C',
     '70-80': '#409EFF',
     '80-90': '#67C23A',
-    '90-100': '#909399'
+    '90-100': '#909399',
+    '>100': '#909399'
   }
   return colors[label] || '#409EFF'
 }
@@ -328,16 +270,9 @@ function calcPassRate(user) {
   return Math.round((passed / total) * 100)
 }
 
-function buildParams() {
-  const params = {}
-  if (filter.value.startDate) params.start_date = filter.value.startDate
-  if (filter.value.endDate) params.end_date = filter.value.endDate
-  return params
-}
-
 async function loadOverview() {
   try {
-    const res = await api.userStats.getOverview(buildParams())
+    const res = await api.userStats.getOverview({})
     overview.value = res
   } catch (e) {
     console.error('获取概览失败', e)
@@ -347,7 +282,7 @@ async function loadOverview() {
 async function loadUsersList() {
   loading.value = true
   try {
-    const res = await api.userStats.getUsersList(buildParams())
+    const res = await api.userStats.getUsersList({})
     usersList.value = res || []
   } catch (e) {
     console.error('获取用户列表失败', e)
@@ -356,24 +291,9 @@ async function loadUsersList() {
   }
 }
 
-async function loadLeaderboard() {
-  loading.value = true
-  try {
-    const res = await api.userStats.getLeaderboard({
-      sort_by: leaderboardSort.value,
-      limit: 20
-    })
-    leaderboard.value = res || []
-  } catch (e) {
-    console.error('获取排行榜失败', e)
-  } finally {
-    loading.value = false
-  }
-}
-
 async function showUserDetail(user) {
   try {
-    const res = await api.userStats.getUserDetail(user.loginid, buildParams())
+    const res = await api.userStats.getUserDetail(user.loginid, {})
     currentUser.value = res
     detailVisible.value = true
   } catch (e) {
@@ -381,24 +301,9 @@ async function showUserDetail(user) {
   }
 }
 
-function handleFilter() {
+onMounted(() => {
   loadOverview()
   loadUsersList()
-  loadLeaderboard()
-}
-
-function handleReset() {
-  filter.value.startDate = ''
-  filter.value.endDate = ''
-  handleFilter()
-}
-
-watch(leaderboardSort, () => {
-  loadLeaderboard()
-})
-
-onMounted(() => {
-  handleFilter()
 })
 </script>
 
@@ -409,6 +314,17 @@ onMounted(() => {
 
 .filter-card {
   margin-bottom: 20px;
+}
+
+.filter-card :deep(.el-card__body) {
+  padding: 12px 20px;
+}
+
+.search-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
 }
 
 .overview-row {

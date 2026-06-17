@@ -75,6 +75,7 @@ class ScoringDetailResponse(BaseModel):
     score: float
     max_score: float
     matched_text: Optional[str] = None
+    is_veto: bool = False  # 是否否决项
 
     class Config:
         from_attributes = True

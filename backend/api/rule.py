@@ -1,13 +1,13 @@
 """
 规则管理路由 - 含规则历史
 """
-from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from typing import Optional, List
 
 from backend.core.database import get_db
+from backend.core.datetime_utils import get_current_time
 from backend.models.rule import ScoringRule
 from backend.schemas.rule import ScoringRuleCreate, ScoringRuleUpdate, ScoringRuleResponse
 from backend.api.auth import get_current_user_required
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/rules", tags=["规则管理"])
 
 def generate_version():
     """生成版本号：v_年月日时分秒"""
-    now = datetime.utcnow()
+    now = get_current_time()
     return f"v_{now.strftime('%y%m%d%H%M%S')}"
 
 
@@ -71,7 +71,7 @@ async def create_rule(
         is_veto=rule_data.is_veto if rule_data.rule_type == 'deduction' else False,
         is_latest=True,
         is_enabled=rule_data.is_enabled if hasattr(rule_data, 'is_enabled') else True,
-        published_at=datetime.utcnow(),
+        published_at=get_current_time(),
         user_id=user_id,
     )
     db.add(rule)
@@ -138,7 +138,7 @@ async def export_rules_json(
     return {
         "rules": data,
         "total": len(data),
-        "export_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "export_time": get_current_time().strftime("%Y-%m-%d %H:%M:%S")
     }
 
 
@@ -199,7 +199,7 @@ async def import_rules(
                 rule_type=rule_type,
                 is_veto=is_veto if rule_type == "deduction" else False,
                 is_latest=True,
-                published_at=datetime.utcnow(),
+                published_at=get_current_time(),
                 user_id=user_id,
             )
             db.add(rule)
@@ -278,7 +278,7 @@ async def update_rule(
         is_latest=True,
         is_enabled=rule.is_enabled,  # 继承启用状态
         parent_id=rule.id,
-        published_at=datetime.utcnow(),
+        published_at=get_current_time(),
         user_id=user_id,
     )
     db.add(new_rule)
@@ -443,7 +443,7 @@ async def rollback_rule(
         is_veto=old_version.is_veto if old_version.rule_type == 'deduction' else False,
         is_latest=True,
         parent_id=current_rule.id,
-        published_at=datetime.utcnow(),
+        published_at=get_current_time(),
         user_id=user_id,
     )
     db.add(new_rule)

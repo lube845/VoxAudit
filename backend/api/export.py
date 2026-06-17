@@ -8,35 +8,69 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 
 from backend.core.database import get_db
+from backend.core.datetime_utils import get_current_time
 from backend.models.recording import Recording, RecordingStatus, ScoringResult
 from backend.models.rule import ScoringRule
 from backend.schemas.recording import RecordingResponse
 from backend.api.auth import get_current_user_required
 from docx import Document
-from docx.shared import Pt, Inches, RGBColor
+from docx.shared import Pt, Inches, RGBColor, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.oxml.ns import qn
 from urllib.parse import quote
 import io
 
 router = APIRouter(prefix="/export", tags=["导出"])
 
 
+def format_seconds_to_timestamp(seconds: float) -> str:
+    """将秒数转换为 mm:ss 格式的时间戳"""
+    if seconds is None:
+        return "00:00"
+    total_seconds = int(seconds)
+    minutes = total_seconds // 60
+    secs = total_seconds % 60
+    return f"{minutes:02d}:{secs:02d}"
+
+
+def format_transcript_segments(transcript_segments, full_text=None) -> str:
+    """将转写片段格式化为要求的格式：
+    客服/客户【时间戳】：
+    内容
+    客服/客户【时间戳】：
+    内容
+    """
+    if not transcript_segments:
+        return full_text or ""
+
+    result_lines = []
+    for seg in transcript_segments:
+        speaker_name = seg.get('speaker_name', seg.get('speaker', '未知'))
+        start_time = seg.get('start_time', 0)
+        text = seg.get('text', '')
+
+        timestamp = format_seconds_to_timestamp(start_time)
+        result_lines.append(f"{speaker_name}【{timestamp}】：\n{text}")
+
+    return "\n".join(result_lines)
+
+
 def get_date_range(days: int):
     """获取日期范围"""
-    now = datetime.utcnow()
+    now = get_current_time()
     end = now
     start = now - timedelta(days=days - 1)
     return start.strftime('%Y-%m-%d %H:%M:%S'), end.strftime('%Y-%m-%d %H:%M:%S')
 
 
-def style_cell(cell, text, bold=False, color=None):
+def style_cell(cell, text, bold=False, color=None, size=Pt(10)):
     """设置单元格样式"""
     cell.text = text
     para = cell.paragraphs[0]
     run = para.runs[0] if para.runs else para.add_run()
     run.bold = bold
-    run.font.size = Pt(10)
+    run.font.size = size
     if color:
         run.font.color.rgb = RGBColor(*color)
 
@@ -93,22 +127,31 @@ def add_recordings_section(doc, recordings, title="录音详情"):
         doc.add_paragraph('暂无数据')
         return
 
-    # 创建表格：坐席姓名 | 文件名 | 加分 | 扣分 | 总分 | 转写文本 | 扣分情况 | 加分情况
+    # 创建表格：坐席姓名 | 文件名 | 加分 | 扣分 | 总分 | 是否否决 | 转写文本 | 扣分情况 | 加分情况
     table = doc.add_table(rows=1, cols=9)
     table.style = 'Table Grid'
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
+
+    # 设置列宽（单位：厘米）
+    # 坐席姓名: 2cm, 文件名: 1.8cm, 加分: 0.8cm, 扣分: 0.8cm, 总分: 0.8cm, 是否否决: 1cm, 转写文本: 9cm, 扣分情况: 2.5cm, 加分情况: 2.5cm
+    col_widths = [Cm(2), Cm(1.8), Cm(0.8), Cm(0.8), Cm(0.8), Cm(1), Cm(9), Cm(2.5), Cm(2.5)]
 
     # 表头
     headers = ['坐席姓名', '文件名', '加分', '扣分', '总分', '是否否决', '转写文本', '扣分情况', '加分情况']
     header_row = table.rows[0]
     for i, header in enumerate(headers):
         cell = header_row.cells[i]
+        cell.width = col_widths[i]
         style_cell(cell, header, bold=True)
         cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
     # 数据行
     for r in recordings:
         row = table.add_row()
+        # 设置每列宽度
+        for i, cell in enumerate(row.cells):
+            cell.width = col_widths[i]
+
         style_cell(row.cells[0], r.get('agent_name', '-') or '-')
         style_cell(row.cells[1], r.get('file_name', '-') or '-')
         style_cell(row.cells[2], f"+{r.get('bonus_score', 0):.1f}" if r.get('bonus_score') else '+0.0')
@@ -118,11 +161,9 @@ def add_recordings_section(doc, recordings, title="录音详情"):
         is_rejected = r.get('is_rejected', False)
         style_cell(row.cells[5], '是' if is_rejected else '否')
 
-        # 转写文本（截取前200字）
-        transcript = r.get('transcript', '') or '-'
-        if len(transcript) > 200:
-            transcript = transcript[:200] + '...'
-        style_cell(row.cells[6], transcript)
+        # 转写文本（完整显示，使用格式化格式）
+        formatted_transcript = format_transcript_segments(r.get('transcript_segments'), r.get('transcript'))
+        style_cell(row.cells[6], formatted_transcript if formatted_transcript else '-')
 
         # 扣分情况 - 从scoring_details中提取，只显示命中的（分数有变化的）
         deduction_details = []
@@ -222,28 +263,29 @@ async def export_single_recording_report(
         for d in scoring.scoring_details:
             row = detail_table.add_row()
             item_type = d.get('item_type', 'bonus')
-            status = d.get('status', 'not_done')
+            status = d.get('status', 'not_matched')
             score = d.get('score', 0)
             max_score = d.get('max_score', 0)
 
             style_cell(row.cells[0], d.get('item_name', '-'))
             style_cell(row.cells[1], '加分' if item_type == 'bonus' else '扣分')
-            status_map = {'done': '已做到', 'not_done': '未做到', 'wrong': '做错'}
+            status_map = {'matched': '已匹配', 'not_matched': '未匹配'}
             style_cell(row.cells[2], status_map.get(status, status))
             style_cell(row.cells[3], f"{score}/{max_score}")
             style_cell(row.cells[4], d.get('matched_text', '-'))
 
     # 转写文本
-    if recording.transcript:
+    if recording.transcript or recording.transcript_segments:
         doc.add_heading('转写文本', level=2)
-        doc.add_paragraph(recording.transcript)
+        formatted_transcript = format_transcript_segments(recording.transcript_segments, recording.transcript)
+        doc.add_paragraph(formatted_transcript)
 
     # 保存文档
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
 
-    filename = f"{datetime.now().strftime('%Y%m%d')}-{recording.agent_name or '未知'}-{recording.file_name}.docx"
+    filename = f"{get_current_time().strftime('%Y%m%d')}-{recording.agent_name or '未知'}-{recording.file_name}.docx"
 
     return StreamingResponse(
         buffer,
@@ -274,13 +316,13 @@ async def export_report(
             date_ranges = [(start_dt, end_dt, f"{start_date[:10]} to {end_date[:10]}")]
         except:
             date_ranges = [
-                (datetime.utcnow() - timedelta(days=6), datetime.utcnow(), 'Last 7 days'),
-                (datetime.utcnow() - timedelta(days=29), datetime.utcnow(), 'Last 30 days')
+                (get_current_time() - timedelta(days=6), get_current_time(), 'Last 7 days'),
+                (get_current_time() - timedelta(days=29), get_current_time(), 'Last 30 days')
             ]
     else:
         date_ranges = [
-            (datetime.utcnow() - timedelta(days=6), datetime.utcnow(), 'Last 7 days'),
-            (datetime.utcnow() - timedelta(days=29), datetime.utcnow(), 'Last 30 days')
+            (get_current_time() - timedelta(days=6), get_current_time(), 'Last 7 days'),
+            (get_current_time() - timedelta(days=29), get_current_time(), 'Last 30 days')
         ]
 
     for start_dt, end_dt, days_text in date_ranges:
@@ -288,16 +330,27 @@ async def export_report(
             Recording.status == RecordingStatus.SCORED,
             Recording.total_score.isnot(None),
             Recording.created_at >= start_dt,
-            Recording.created_at <= end_dt,
+            Recording.created_at < end_dt + timedelta(days=1),
             Recording.user_id == user_id
         ]
 
         if type == "agent" and agent_name:
             conditions.append(Recording.agent_name == agent_name)
 
-        # 获取概览数据
-        total_result = await db.execute(select(func.count()).where(and_(*conditions)))
+        # 获取概览数据 - total_recordings（所有上传的录音，不限状态）
+        total_conditions = [
+            Recording.user_id == user_id,
+            Recording.created_at >= start_dt,
+            Recording.created_at < end_dt + timedelta(days=1)
+        ]
+        if type == "agent" and agent_name:
+            total_conditions.append(Recording.agent_name == agent_name)
+        total_result = await db.execute(select(func.count()).where(and_(*total_conditions)))
         total_recordings = total_result.scalar() or 0
+
+        # 已评分数
+        scored_count = await db.execute(select(func.count()).where(and_(*conditions)))
+        scored_count = scored_count.scalar() or 0
 
         bonus_cond = conditions + [Recording.bonus_score.isnot(None), Recording.bonus_score > 0]
         bonus_count_result = await db.execute(select(func.count()).where(and_(*bonus_cond)))
@@ -333,7 +386,7 @@ async def export_report(
 
         overview_data = {
             'total_recordings': total_recordings,
-            'scored_count': total_recordings,
+            'scored_count': scored_count,
             'recordings_with_bonus': recordings_with_bonus,
             'recordings_with_deduction': recordings_with_deduction,
             'recordings_with_rejection': recordings_with_rejection,
@@ -372,6 +425,7 @@ async def export_report(
                     'deduction_score': recording.deduction_score or 0,
                     'total_score': recording.total_score or 0,
                     'transcript': recording.transcript or '',
+                    'transcript_segments': recording.transcript_segments or [],
                     'scoring_details': scoring.scoring_details if scoring and scoring.scoring_details else [],
                     'is_rejected': getattr(scoring, 'is_rejected', False) if scoring else False,
                     'created_at': recording.created_at,
@@ -390,7 +444,7 @@ async def export_report(
     doc.save(buffer)
     buffer.seek(0)
 
-    filename = f"score_report_{agent_name if agent_name else 'all'}_{datetime.now().strftime('%Y%m%d%H%M%S')}.docx"
+    filename = f"score_report_{agent_name if agent_name else 'all'}_{get_current_time().strftime('%Y%m%d%H%M%S')}.docx"
 
     return StreamingResponse(
         buffer,

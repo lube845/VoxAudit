@@ -89,13 +89,27 @@ class AIScoringService:
         segments: List[Dict],
         bonus_items: List[Dict],
     ) -> Dict:
-        """对加分规则进行评分"""
+        """对加分规则进行评分，JSON解析失败时自动重试LLM"""
         if not bonus_items:
             return {"total_score": 0, "total_max_score": 0, "details": [], "warnings": []}
 
         prompt = self._build_bonus_prompt(transcript, segments, bonus_items)
-        content = await self._call_llm(prompt)
-        return self._parse_bonus_result(content, bonus_items)
+        retry_count = settings.LLM_JSON_RETRY_COUNT
+        last_error = None
+
+        for attempt in range(retry_count):
+            try:
+                content = await self._call_llm(prompt)
+                return self._parse_bonus_result(content, bonus_items)
+            except Exception as e:
+                last_error = e
+                if attempt < retry_count - 1:
+                    logger.warning(f"JSON解析失败 (尝试 {attempt + 1}/{retry_count}): {str(e)}, 重新调用LLM...")
+                    import asyncio
+                    await asyncio.sleep(1)  # 等待1秒后重试
+                    continue
+
+        raise last_error
 
     async def _score_deduction_rules(
         self,
@@ -103,13 +117,27 @@ class AIScoringService:
         segments: List[Dict],
         deduction_items: List[Dict],
     ) -> Dict:
-        """对减分规则进行评分"""
+        """对减分规则进行评分，JSON解析失败时自动重试LLM"""
         if not deduction_items:
             return {"total_score": 0, "total_max_score": 0, "details": [], "warnings": []}
 
         prompt = self._build_deduction_prompt(transcript, segments, deduction_items)
-        content = await self._call_llm(prompt)
-        return self._parse_deduction_result(content, deduction_items)
+        retry_count = settings.LLM_JSON_RETRY_COUNT
+        last_error = None
+
+        for attempt in range(retry_count):
+            try:
+                content = await self._call_llm(prompt)
+                return self._parse_deduction_result(content, deduction_items)
+            except Exception as e:
+                last_error = e
+                if attempt < retry_count - 1:
+                    logger.warning(f"JSON解析失败 (尝试 {attempt + 1}/{retry_count}): {str(e)}, 重新调用LLM...")
+                    import asyncio
+                    await asyncio.sleep(1)  # 等待1秒后重试
+                    continue
+
+        raise last_error
 
     async def _call_llm(self, prompt: str, max_retries: int = 3) -> str:
         """调用LLM API，带自动重试机制"""
@@ -257,6 +285,7 @@ class AIScoringService:
     ) -> Dict:
         """解析加分规则评分结果"""
         try:
+            logger.info(f"[LLM原始输出] bonus: {content[:2000] if content else '空内容'}")
             result = self._extract_json(content)
             items_result = result.get("items", [])
             warnings = result.get("warnings", [])
@@ -288,6 +317,7 @@ class AIScoringService:
                     "score": score,
                     "max_score": item["max_score"],
                     "matched_text": matched_text,
+                    "is_veto": item.get("is_veto", False),
                 })
 
             return {
@@ -308,6 +338,7 @@ class AIScoringService:
     ) -> Dict:
         """解析减分规则评分结果"""
         try:
+            logger.info(f"[LLM原始输出] deduction: {content[:2000] if content else '空内容'}")
             result = self._extract_json(content)
             items_result = result.get("items", [])
             warnings = result.get("warnings", [])
@@ -338,6 +369,7 @@ class AIScoringService:
                     "score": -deduction,
                     "max_score": item["max_score"],
                     "matched_text": item_result.get("matched_text", "") if item_result else "",
+                    "is_veto": item.get("is_veto", False),
                 })
 
             return {
@@ -353,7 +385,7 @@ class AIScoringService:
 
     def _fix_unescaped_commas(self, json_str: str) -> str:
         """修复JSON字符串中未转义的字符"""
-        # 替换中文标点为英文标点（仅在字符串外）
+        # 替换中文标点和单引号为英文标点（仅在字符串外）
         result = []
         in_string = False
         i = 0
@@ -363,11 +395,14 @@ class AIScoringService:
                 in_string = not in_string
                 result.append(char)
             elif not in_string:
-                # 不在字符串内，替换中文标点
+                # 不在字符串内，替换中文标点和单引号
                 if char == '，':
                     result.append(',')
                 elif char == '：':
                     result.append(':')
+                elif char == "'":
+                    # 单引号替换为双引号（处理LLM返回的单引号JSON）
+                    result.append('"')
                 elif char == '"':
                     # 不在字符串内的引号，可能是多余的
                     result.append('"')
@@ -384,13 +419,109 @@ class AIScoringService:
                         result.append('\\"')
                         i += 2
                         continue
+                    elif json_str[i+1] == "'":
+                        # 处理字符串内的单引号
+                        result.append("\\'")
+                        i += 2
+                        continue
                 result.append(char)
             i += 1
         return ''.join(result)
 
+    def _try_fix_truncated_json(self, json_str: str) -> Optional[Dict]:
+        """尝试修复被截断的JSON，返回修复后的结果或None"""
+        original = json_str
+        max_attempts = 3
+
+        for attempt in range(max_attempts):
+            try:
+                return json.loads(json_str)
+            except json.JSONDecodeError as e:
+                pos = e.pos
+                # 尝试修复：截断位置在字符串内部导致的不完整
+                if pos is not None and pos > 0:
+                    # 检查截断位置是否在字符串内（引号未闭合）
+                    in_string = False
+                    last_unescaped_quote = -1
+                    i = 0
+                    while i < pos and i < len(json_str):
+                        char = json_str[i]
+                        if char == '"' and (i == 0 or json_str[i-1] != '\\'):
+                            in_string = not in_string
+                            if in_string:
+                                last_unescaped_quote = i
+                        i += 1
+
+                    # 如果截断时正在字符串内，尝试闭合它
+                    if in_string and last_unescaped_quote >= 0:
+                        # 找到最后一个未闭合的字符串，闭合它
+                        json_str = json_str[:pos] + '"' + json_str[pos:]
+                        try:
+                            return json.loads(json_str)
+                        except json.JSONDecodeError:
+                            pass
+
+                # 尝试移除末尾的不完整内容（数组/对象元素）
+                truncated = json_str.rstrip()
+                for suffix in ["},", "],", "]", "}"]:
+                    if truncated.endswith(suffix):
+                        break
+                    # 找到最后一个完整的数组/对象元素
+                    last_delim = max(
+                        truncated.rfind("},"),
+                        truncated.rfind("],"),
+                        truncated.rfind('"}'),
+                    )
+                    if last_delim > 0:
+                        truncated = truncated[:last_delim + 1]
+                        try:
+                            return json.loads(truncated)
+                        except json.JSONDecodeError:
+                            pass
+
+                # 尝试移除末尾不完整的 key-value 对
+                last_comma = truncated.rfind(",")
+                if last_comma > 0:
+                    truncated = truncated[:last_comma] + "}"
+                    try:
+                        return json.loads(truncated)
+                    except json.JSONDecodeError:
+                        pass
+
+                # 尝试移除末尾不完整的字符串
+                if last_unescaped_quote >= 0:
+                    truncated = json_str[:last_unescaped_quote] + '"}'
+                    try:
+                        return json.loads(truncated)
+                    except json.JSONDecodeError:
+                        pass
+
+                # 尝试在末尾补全常见的闭合
+                for closer in ['"]}', "}]}", "]}"]:
+                    if truncated.endswith('"') or truncated.endswith('{') or truncated.endswith('['):
+                        candidate = truncated + closer
+                        try:
+                            result = json.loads(candidate)
+                            logger.warning(f"JSON被截断，已自动修复: {original[:50]}... -> {candidate[:50]}...")
+                            return result
+                        except json.JSONDecodeError:
+                            pass
+
+                # 如果本次尝试没有改变json_str，跳出循环避免死循环
+                if json_str == original:
+                    break
+                original = json_str
+
+        return None
+
     def _extract_json(self, content: str) -> Dict:
         """从LLM返回的内容中提取JSON"""
         try:
+            # 清理空白字符
+            content = content.strip()
+            if not content:
+                raise json.JSONDecodeError("LLM返回内容为空", content, 0)
+
             json_start = content.find("{")
             json_end = content.rfind("}") + 1
             if json_start >= 0 and json_end > json_start:
@@ -398,13 +529,23 @@ class AIScoringService:
                 # 清理常见的JSON格式问题
                 json_str = json_str.replace(",}", "}")  # 移除尾随逗号
                 json_str = json_str.replace(",]", "]")  # 移除数组尾随逗号
-                # 修复字符串中未转义的逗号（仅在JSON解析失败时尝试修复）
+                # 首先尝试直接解析
                 try:
                     return json.loads(json_str)
                 except json.JSONDecodeError:
-                    # 尝试修复未转义逗号的问题
-                    json_str = self._fix_unescaped_commas(json_str)
+                    pass
+                # 尝试修复未转义逗号的问题
+                json_str = self._fix_unescaped_commas(json_str)
+                try:
                     return json.loads(json_str)
+                except json.JSONDecodeError:
+                    pass
+                # 尝试修复被截断的JSON
+                fixed = self._try_fix_truncated_json(json_str)
+                if fixed is not None:
+                    return fixed
+                # 所有修复都失败，抛出原始错误
+                raise json.JSONDecodeError("无法解析JSON", json_str, 0)
             return json.loads(content)
         except json.JSONDecodeError as e:
             logger.error(f"JSON解析失败 content={content[:200]}, error={e}")

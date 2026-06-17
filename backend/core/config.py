@@ -69,6 +69,17 @@ class Settings(BaseSettings):
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
 
+    # 批量重试并发控制（按用户）
+    MAX_RETRY_CONCURRENCY: int = 5
+    MAX_LLM_CONCURRENCY: int = 3
+
+    # 批量重试并发控制（全局）
+    MAX_GLOBAL_ASR_CONCURRENCY: int = 20
+    MAX_GLOBAL_LLM_CONCURRENCY: int = 10
+
+    # LLM JSON解析失败重试次数
+    LLM_JSON_RETRY_COUNT: int = 3
+
     # CORS配置
     CORS_ORIGINS: str = "http://localhost:8888,http://localhost:3000"
 

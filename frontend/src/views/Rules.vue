@@ -101,10 +101,12 @@
       <el-pagination
         v-if="bonusTotal > 0"
         v-model:current-page="bonusPage"
-        :page-size="5"
+        v-model:page-size="bonusPageSize"
+        :page-sizes="[5, 10, 20]"
         :total="bonusTotal"
-        layout="prev, pager, next"
-        @current-change="loadRules"
+        layout="sizes, prev, pager, next"
+        @current-change="handleBonusPageChange"
+        @size-change="handleBonusSizeChange"
         class="pagination"
       />
 
@@ -173,10 +175,12 @@
       <el-pagination
         v-if="deductionTotal > 0"
         v-model:current-page="deductionPage"
-        :page-size="5"
+        v-model:page-size="deductionPageSize"
+        :page-sizes="[5, 10, 20]"
         :total="deductionTotal"
-        layout="prev, pager, next"
-        @current-change="loadRules"
+        layout="sizes, prev, pager, next"
+        @current-change="handleDeductionPageChange"
+        @size-change="handleDeductionSizeChange"
         class="pagination"
       />
 
@@ -211,11 +215,6 @@
             {{ form.is_latest ? '是' : '否' }}
           </el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="启用状态">
-          <el-tag :type="form.is_enabled ? 'success' : 'info'">
-            {{ form.is_enabled ? '是' : '否' }}
-          </el-tag>
-        </el-descriptions-item>
         <el-descriptions-item label="描述" :span="2">{{ form.description || '无' }}</el-descriptions-item>
       </el-descriptions>
       <template #footer>
@@ -238,8 +237,8 @@
         <el-form-item label="分值" prop="total_score">
           <el-input-number v-model="form.total_score" :min="0" :max="100" :precision="1" />
         </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="form.description" type="textarea" rows="3" placeholder="请输入规则描述..." maxlength="500" show-word-limit />
+        <el-form-item label="描述" prop="description">
+          <el-input v-model="form.description" type="textarea" rows="3" placeholder="规则描述必填，越清晰越好，大模型根据该字段来理解规则" maxlength="500" show-word-limit />
         </el-form-item>
         <el-form-item v-if="form.rule_type === 'deduction'" label="否决项">
           <el-switch v-model="form.is_veto" active-color="#f56c6c" inactive-color="#909399" />
@@ -274,7 +273,7 @@
         </el-table-column>
         <el-table-column prop="published_at" label="发布时间" width="160">
           <template #default="{ row }">
-            {{ row.published_at ? new Date(row.published_at).toLocaleString() : '-' }}
+            {{ formatDate(row.published_at) }}
           </template>
         </el-table-column>
         <el-table-column label="操作" width="150" align="center">
@@ -295,6 +294,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus, Download, Upload } from '@element-plus/icons-vue'
+import { formatDate, getTimezone } from '@/utils/timezone'
 import api from '@/api'
 
 const loading = ref(false)
@@ -304,6 +304,8 @@ const searchKeyword = ref('')
 // 分页
 const bonusPage = ref(1)
 const deductionPage = ref(1)
+const bonusPageSize = ref(5)
+const deductionPageSize = ref(5)
 const bonusTotal = ref(0)
 const deductionTotal = ref(0)
 
@@ -340,12 +342,24 @@ const form = reactive({
 
 const rules = {
   name: [{ required: true, message: '请输入规则名称', trigger: 'blur' }],
+  description: [{ required: true, message: '请输入规则描述', trigger: 'blur' }],
   total_score: [{ required: true, message: '请输入分数', trigger: 'blur' }]
 }
 
-// 计算属性
-const bonusRules = computed(() => list.value.filter(r => r.rule_type === 'bonus'))
-const deductionRules = computed(() => list.value.filter(r => r.rule_type === 'deduction'))
+// 计算属性 - 带分页
+const bonusRules = computed(() => {
+  const filtered = list.value.filter(r => r.rule_type === 'bonus')
+  const start = (bonusPage.value - 1) * bonusPageSize.value
+  const end = start + bonusPageSize.value
+  return filtered.slice(start, end)
+})
+
+const deductionRules = computed(() => {
+  const filtered = list.value.filter(r => r.rule_type === 'deduction')
+  const start = (deductionPage.value - 1) * deductionPageSize.value
+  const end = start + deductionPageSize.value
+  return filtered.slice(start, end)
+})
 
 // 方法
 async function loadRules() {
@@ -366,6 +380,22 @@ async function loadRules() {
   } finally {
     loading.value = false
   }
+}
+
+function handleBonusPageChange() {
+  // 页码变化时无需额外操作，computed会自动重新计算
+}
+
+function handleBonusSizeChange() {
+  bonusPage.value = 1
+}
+
+function handleDeductionPageChange() {
+  // 页码变化时无需额外操作，computed会自动重新计算
+}
+
+function handleDeductionSizeChange() {
+  deductionPage.value = 1
 }
 
 async function exportRules() {

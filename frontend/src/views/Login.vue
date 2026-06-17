@@ -14,12 +14,18 @@
         <el-form-item prop="password">
           <el-input
             v-model="form.password"
-            type="password"
-            placeholder="密码"
+            :type="showPassword ? 'text' : 'password'"
+            placeholder="OA密码"
             prefix-icon="Lock"
             size="large"
             @keyup.enter="handleLogin"
-          />
+          >
+            <template #suffix>
+              <el-icon class="password-toggle" @click="showPassword = !showPassword">
+                <component :is="showPassword ? 'Eye' : 'Hide'" />
+              </el-icon>
+            </template>
+          </el-input>
         </el-form-item>
         <el-form-item>
           <el-button
@@ -46,6 +52,7 @@ import api from '@/api'
 const router = useRouter()
 const formRef = ref(null)
 const loading = ref(false)
+const showPassword = ref(false)
 
 const form = reactive({
   loginid: '',
@@ -109,5 +116,14 @@ const handleLogin = async () => {
 
 .login-button {
   width: 100%;
+}
+
+.password-toggle {
+  cursor: pointer;
+  color: #909399;
+}
+
+.password-toggle:hover {
+  color: #409eff;
 }
 </style>

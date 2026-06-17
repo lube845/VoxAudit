@@ -16,6 +16,10 @@
               <el-icon><Upload /></el-icon>
               上传录音
             </el-button>
+            <el-button @click="handleRefresh" :loading="refreshing">
+              <el-icon><RefreshRight /></el-icon>
+              刷新状态
+            </el-button>
           </div>
         </div>
       </template>
@@ -101,17 +105,21 @@
             v-model="queryParams.score_operator"
             placeholder="条件"
             clearable
-            style="width: 80px"
+            style="width: 100px"
             @change="handleScoreFilterChange"
           >
-            <el-option label="≥" value="gte" />
-            <el-option label="≤" value="lte" />
+            <el-option label="大于" value="gt" />
+            <el-option label="大于等于" value="gte" />
+            <el-option label="等于" value="eq" />
+            <el-option label="小于等于" value="lte" />
+            <el-option label="小于" value="lt" />
           </el-select>
           <el-input
             v-model="queryParams.score_value"
             placeholder="分值"
             clearable
             style="width: 80px"
+            type="number"
             @input="handleScoreFilterChange"
           />
         </div>
@@ -138,20 +146,20 @@
         <el-table-column prop="total_score" label="总分" width="80" align="center">
           <template #default="{ row }">
             <span v-if="row.total_score !== null" :style="{ color: row.total_score >= 60 ? '#67c23a' : '#f56c6c' }">
-              {{ row.total_score }}
+              {{ row.total_score >= 0 ? '+' : '' }}{{ row.total_score }}
             </span>
             <span v-else>-</span>
           </template>
         </el-table-column>
         <el-table-column prop="bonus_score" label="加分" width="80">
           <template #default="{ row }">
-            <span v-if="row.bonus_score != null" style="color: #67c23a">+{{ row.bonus_score.toFixed(1) }}</span>
+            <span v-if="row.bonus_score != null" style="color: #67c23a">{{ row.bonus_score.toFixed(1) }}</span>
             <span v-else>-</span>
           </template>
         </el-table-column>
         <el-table-column prop="deduction_score" label="扣分" width="80">
           <template #default="{ row }">
-            <span v-if="row.deduction_score != null" style="color: #f56c6c">-{{ row.deduction_score.toFixed(1) }}</span>
+            <span v-if="row.deduction_score != null" style="color: #f56c6c">{{ row.deduction_score.toFixed(1) }}</span>
             <span v-else>-</span>
           </template>
         </el-table-column>
@@ -170,7 +178,6 @@
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="viewDetail(row.id)">详情</el-button>
-            <el-button link type="warning" v-if="row.status === 'transcribe_failed' || row.status === 'score_failed'" @click="handleRetry(row)">重试</el-button>
             <el-button link type="danger" @click="deleteRecord(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -214,7 +221,7 @@
               </div>
             </div>
             <template #tip>
-              <div class="upload-tip">支持 MP3/WAV/AMR/M4A 格式，支持 ZIP 压缩包（自动提取音频文件）</div>
+              <div class="upload-tip">支持 MP3/WAV/AMR/M4A 及 ZIP 压缩包（最大支持500MB，自动提取音频文件）</div>
             </template>
           </el-upload>
         </el-form-item>
@@ -241,14 +248,15 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Upload } from '@element-plus/icons-vue'
-import dayjs from 'dayjs'
+import { Search, Upload, RefreshRight } from '@element-plus/icons-vue'
+import { formatDate, now } from '@/utils/timezone'
 import CryptoJS from 'crypto-js'
 import api from '@/api'
 
 const router = useRouter()
 
 const loading = ref(false)
+const refreshing = ref(false)
 const uploading = ref(false)
 const isProcessingZip = ref(false)
 const list = ref([])
@@ -276,10 +284,10 @@ const queryParams = reactive({
 const dateRange = ref([])
 
 const shortcuts = [
-  { text: '近一周', value: () => { const end = new Date(); const start = new Date(); start.setDate(start.getDate() - 6); return [start, end] } },
-  { text: '近一月', value: () => { const end = new Date(); const start = new Date(); start.setDate(start.getDate() - 29); return [start, end] } },
-  { text: '近半年', value: () => { const end = new Date(); const start = new Date(); start.setDate(start.getDate() - 179); return [start, end] } },
-  { text: '近一年', value: () => { const end = new Date(); const start = new Date(); start.setDate(start.getDate() - 364); return [start, end] } }
+  { text: '近一周', value: () => [now().subtract(6, 'day').toDate(), now().toDate()] },
+  { text: '近一月', value: () => [now().subtract(29, 'day').toDate(), now().toDate()] },
+  { text: '近半年', value: () => [now().subtract(179, 'day').toDate(), now().toDate()] },
+  { text: '近一年', value: () => [now().subtract(364, 'day').toDate(), now().toDate()] }
 ]
 
 const uploadForm = reactive({ agent_id: '', agent_name: '' })
@@ -305,10 +313,6 @@ function getStatusText(status) {
   return statusMap[status]?.text || status
 }
 
-function formatDate(date) {
-  if (!date) return '-'
-  return dayjs(date).format('YYYY-MM-DD HH:mm:ss')
-}
 
 // 数据加载
 async function loadData() {
@@ -330,6 +334,18 @@ async function loadAgentOptions() {
     agentOptions.value = res || []
   } catch (e) {
     console.error(e)
+  }
+}
+
+async function handleRefresh() {
+  refreshing.value = true
+  try {
+    await loadData()
+    ElMessage.success('刷新成功')
+  } catch (e) {
+    console.error(e)
+  } finally {
+    refreshing.value = false
   }
 }
 
@@ -374,33 +390,6 @@ async function viewDetail(id) {
   router.push(`/recordings/${id}`)
 }
 
-async function retryTranscribe(row) {
-  try {
-    await api.recording.triggerTranscribe(row.id)
-    ElMessage.success('已重新触发转写')
-    loadData()
-  } catch (e) {
-    ElMessage.error('重试转写失败')
-  }
-}
-
-async function handleRetry(row) {
-  if (row.status === 'transcribe_failed') {
-    retryTranscribe(row)
-  } else if (row.status === 'score_failed') {
-    retryScore(row)
-  }
-}
-
-async function retryScore(row) {
-  try {
-    await api.recording.triggerScore(row.id)
-    ElMessage.success('已重新触发评分')
-    loadData()
-  } catch (e) {
-    ElMessage.error('重试评分失败')
-  }
-}
 
 async function deleteRecord(row) {
   try {
@@ -446,8 +435,27 @@ function getMimeType(ext) {
 
 async function handleFileChange(file, files) {
   const ext = file.name.split('.').pop().toLowerCase()
+  const allowedExts = ['mp3', 'wav', 'amr', 'm4a', 'zip']
+
+  if (!allowedExts.includes(ext)) {
+    ElMessage.error('不支持的文件格式，仅支持 MP3/WAV/AMR/M4A/ZIP 格式')
+    // 从 fileList 中移除无效文件，使用 files 参数过滤（排除无效扩展名）
+    const allowedFiles = files.filter(f => allowedExts.includes(f.name.split('.').pop().toLowerCase()))
+    fileList.value = allowedFiles
+    return
+  }
 
   if (ext === 'zip') {
+    const MAX_ZIP_SIZE = 500 * 1024 * 1024 // 500MB
+    if (file.size > MAX_ZIP_SIZE) {
+      ElMessage.error('ZIP 压缩包最大支持 500MB')
+      const allowedFiles = files.filter(f => {
+        const e = f.name.split('.').pop().toLowerCase()
+        return allowedExts.includes(e) && (e !== 'zip' || f.size <= MAX_ZIP_SIZE)
+      })
+      fileList.value = allowedFiles
+      return
+    }
     if (isProcessingZip.value) return
     isProcessingZip.value = true
 
@@ -650,6 +658,16 @@ onMounted(() => {
 .score-filter :deep(.el-input.is-focus .el-input__wrapper) {
   box-shadow: none !important;
   background: transparent;
+}
+
+.score-filter :deep(input[type="number"]) {
+  -moz-appearance: textfield;
+}
+
+.score-filter :deep(input[type="number"]::-webkit-outer-spin-button),
+.score-filter :deep(input[type="number"]::-webkit-inner-spin-button) {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .total-count {

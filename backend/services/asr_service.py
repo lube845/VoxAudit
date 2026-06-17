@@ -150,15 +150,20 @@ class ASRService:
                 logging.warning(f"LLM角色判断失败：LLM返回格式无效JSON ({error_type}: {error_msg})")
             else:
                 logging.warning(f"LLM角色判断失败：{error_type}: {error_msg}")
+            customer_map = {}
             customer_counter = 0
             for seg in segments:
                 if seg.get("speaker") == "speaker_0":
                     seg["speaker"] = "agent"
                     seg["speaker_name"] = "坐席"
                 else:
-                    customer_counter += 1
-                    seg["speaker"] = "customer_" + str(customer_counter)
-                    seg["speaker_name"] = "客户" + str(customer_counter)
+                    original_speaker = seg.get("speaker", "unknown")
+                    if original_speaker not in customer_map:
+                        customer_counter += 1
+                        customer_map[original_speaker] = customer_counter
+                    customer_num = customer_map[original_speaker]
+                    seg["speaker"] = "customer_" + str(customer_num)
+                    seg["speaker_name"] = "客户" + str(customer_num)
             return segments
 
     def _extract_json(self, text: str) -> str:
@@ -188,7 +193,7 @@ class ASRService:
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": 1024,
             "chat_template_kwargs": {"enable_thinking": False},
-            "stream": false,
+            "stream": False,
         }
         async with httpx.AsyncClient(timeout=60) as client:
             response = await client.post(settings.LLM_API_ENDPOINT, headers=headers, json=payload)
@@ -201,12 +206,17 @@ class ASRService:
 
     def _parse_transcript_result(self, result: Dict) -> Dict:
         """解析ASR返回的Markdown结果"""
+        import logging
+        logger = logging.getLogger(__name__)
         markdown_text = result.get("markdown", "")
         speaker_cnt = result.get("speaker_cnt", 0)
-        
+
+        if not markdown_text:
+            logger.warning(f"[ASR] API响应中无markdown字段，完整响应: {result}")
+
         segments = self._parse_markdown(markdown_text)
         full_text = "\n".join([seg["text"] for seg in segments])
-        
+
         return {
             "full_text": full_text,
             "segments": segments,
@@ -215,14 +225,19 @@ class ASRService:
 
     def _parse_markdown(self, markdown: str) -> List[Dict]:
         """解析Markdown格式的转写结果"""
+        import logging
+        logger = logging.getLogger(__name__)
         segments = []
         markdown = re.sub(r"^#.*$", "", markdown, flags=re.MULTILINE)
-        
+
         # 匹配 **说话人0** `00:00 - 00:08` 文本内容
         pattern = r"\*\*说话人(\d+)\*\*\s+`(\d{2}:\d{2})\s+-\s+(\d{2}:\d{2})`\s*(.+?)(?=\*\*说话人|$)"
-        
+
         matches = re.findall(pattern, markdown, re.DOTALL)
-        
+
+        if not matches:
+            logger.warning(f"[ASR] markdown解析无匹配结果，原始内容: {markdown[:500]}")
+
         for match in matches:
             speaker_id = f"speaker_{match[0]}"
             start_time = self._parse_time(match[1])

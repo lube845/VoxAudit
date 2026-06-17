@@ -2,12 +2,12 @@
 录音文件相关数据模型
 """
 import enum
-from datetime import datetime
 from sqlalchemy import (
     Column, Integer, String, Boolean, DateTime, Text, Float, ForeignKey, JSON, Enum
 )
 
 from backend.core.database import Base
+from backend.core.datetime_utils import get_current_time
 
 
 class RecordingStatus(enum.Enum):
@@ -61,8 +61,8 @@ class Recording(Base):
     rule_version = Column(String(20), nullable=True, comment="规则版本")
     remark = Column(Text, nullable=True, comment="备注/错误信息")
 
-    created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment="更新时间")
+    created_at = Column(DateTime, default=get_current_time, comment="创建时间")
+    updated_at = Column(DateTime, default=get_current_time, onupdate=get_current_time, comment="更新时间")
 
 
 class TranscriptSegment(Base):
@@ -105,4 +105,4 @@ class ScoringResult(Base):
     # 用户归属（admin=超级管理员）
     user_id = Column(String(50), nullable=True, index=True, comment="所属用户loginid")
 
-    created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
+    created_at = Column(DateTime, default=get_current_time, comment="创建时间")

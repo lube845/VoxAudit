@@ -134,7 +134,6 @@ backend/oa_auth.py
 # ------------------
 backend/migrations/versions/
 *.bak
-backend/upload_rules_template.json
 
 # ------------------
 # Frontend

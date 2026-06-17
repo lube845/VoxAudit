@@ -117,6 +117,7 @@
 import { ref, onMounted } from 'vue'
 import { Download, Document, User, Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { now } from '@/utils/timezone'
 import api from '@/api'
 
 const exportType = ref('all')
@@ -130,36 +131,32 @@ const shortcuts = [
   {
     text: '近一周',
     value: () => {
-      const end = new Date()
-      const start = new Date()
-      start.setDate(start.getDate() - 6)
+      const end = now().toDate()
+      const start = now().subtract(6, 'day').toDate()
       return [start, end]
     }
   },
   {
     text: '近一月',
     value: () => {
-      const end = new Date()
-      const start = new Date()
-      start.setDate(start.getDate() - 29)
+      const end = now().toDate()
+      const start = now().subtract(29, 'day').toDate()
       return [start, end]
     }
   },
   {
     text: '近半年',
     value: () => {
-      const end = new Date()
-      const start = new Date()
-      start.setDate(start.getDate() - 179)
+      const end = now().toDate()
+      const start = now().subtract(179, 'day').toDate()
       return [start, end]
     }
   },
   {
     text: '近一年',
     value: () => {
-      const end = new Date()
-      const start = new Date()
-      start.setDate(start.getDate() - 364)
+      const end = now().toDate()
+      const start = now().subtract(364, 'day').toDate()
       return [start, end]
     }
   }
