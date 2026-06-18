@@ -694,6 +694,100 @@ async def get_scoring_result(
     }
 
 
+@router.post("/{recording_id}/transcribe")
+async def trigger_transcribe(
+    recording_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user_required)
+):
+    """手动触发转写"""
+    user_id = current_user.get("loginid", "admin")
+    result = await db.execute(
+        select(Recording).where(
+            Recording.id == recording_id,
+            Recording.user_id == user_id
+        )
+    )
+    recording = result.scalar_one_or_none()
+    if not recording:
+        raise HTTPException(status_code=404, detail="录音不存在")
+
+    if recording.status != RecordingStatus.UPLOADED:
+        raise HTTPException(status_code=400, detail="录音状态不正确")
+
+    asyncio.create_task(transcribe_recording_bg(recording_id, user_id))
+    return {"message": "转写任务已触发"}
+
+
+@router.post("/{recording_id}/score")
+async def trigger_scoring(
+    recording_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user_required)
+):
+    """手动触发评分"""
+    user_id = current_user.get("loginid", "admin")
+    result = await db.execute(
+        select(Recording).where(
+            Recording.id == recording_id,
+            Recording.user_id == user_id
+        )
+    )
+    recording = result.scalar_one_or_none()
+    if not recording:
+        raise HTTPException(status_code=404, detail="录音不存在")
+
+    if recording.status not in [RecordingStatus.TRANSCRIBED, RecordingStatus.SCORE_FAILED]:
+        raise HTTPException(status_code=400, detail="录音未完成转写")
+
+    asyncio.create_task(auto_score_recording(recording_id, user_id=user_id))
+    return {"message": "评分任务已触发"}
+
+
+@router.post("/batch-retry")
+async def batch_retry(
+    recording_ids: List[int],
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_user_required)
+):
+    """批量重试录音（ASR-说话人判别-打分）"""
+    user_id = current_user.get("loginid", "admin")
+
+    # 查询所有录音
+    result = await db.execute(
+        select(Recording).where(
+            Recording.id.in_(recording_ids),
+            Recording.user_id == user_id
+        )
+    )
+    recordings = result.scalars().all()
+
+    if not recordings:
+        raise HTTPException(status_code=404, detail="录音不存在")
+
+    # 第一阶段：清理数据、重置状态，统一提交
+    for recording in recordings:
+        await db.execute(delete(TranscriptSegment).where(TranscriptSegment.recording_id == recording.id))
+        await db.execute(delete(ScoringResult).where(ScoringResult.recording_id == recording.id))
+
+        recording.transcript = None
+        recording.transcript_segments = None
+        recording.total_score = None
+        recording.bonus_score = None
+        recording.deduction_score = None
+        recording.remark = None
+        recording.status = RecordingStatus.UPLOADED
+
+    await db.commit()  # 确保所有状态落库后再创建任务
+
+    # 第二阶段：统一创建后台任务
+    retry_ids = [r.id for r in recordings]
+    for recording_id in retry_ids:
+        asyncio.create_task(transcribe_recording_bg(recording_id, user_id))
+
+    return {"message": f"已提交 {len(retry_ids)} 条重试任务", "results": [{"id": rid, "action": "transcribe"} for rid in retry_ids]}
+
+
 @router.get("/{recording_id}/play")
 async def play_recording(
     recording_id: int,

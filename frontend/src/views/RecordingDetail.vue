@@ -269,7 +269,6 @@ async function copyText() {
   }
 }
 
-
 async function exportReport() {
   try {
     const response = await api.export.exportSingleRecording(recording.value.id)
@@ -297,15 +296,41 @@ async function loadData() {
     if (recData.scoring_results && recData.scoring_results.length > 0) {
       scoringResult.value = recData.scoring_results[0]
     }
+    // 如果转写未完成，轮询等待转写完成
+    if (recData.status === 'uploaded' || recData.status === 'transcribing') {
+      pollTranscriptionResult()
+    }
   } catch (e) {
     console.error(e)
   }
-  // 兼容单独调用 score 接口的方式（如果 scoring_results 为空）
+   // 兼容单独调用 score 接口的方式（如果 scoring_results 为空）
   if (!scoringResult.value) {
     try {
       const id = route.params.id
       const scoreData = await api.recording.getScore(id)
       scoringResult.value = scoreData
+    } catch (e) {
+      console.error(e)
+    }
+  }
+}
+
+async function pollTranscriptionResult() {
+  const maxAttempts = 60
+  const interval = 3000
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise(resolve => setTimeout(resolve, interval))
+    try {
+      const id = route.params.id
+      const recData = await api.recording.get(id)
+      recording.value = recData
+      // 转写完成或失败，停止轮询
+      if (recData.status === 'transcribed' || recData.status === 'scoring' || recData.status === 'scored') {
+        break
+      }
+      if (recData.status === 'transcribe_failed') {
+        break
+      }
     } catch (e) {
       console.error(e)
     }

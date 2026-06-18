@@ -12,6 +12,13 @@
             >
               批量删除{{ selectedRecords.length > 0 ? ` (${selectedRecords.length})` : '' }}
             </el-button>
+            <el-button
+              type="warning"
+              :disabled="selectedRecords.length === 0"
+              @click="batchRetryRecords"
+            >
+              批量重试{{ selectedRecords.length > 0 ? ` (${selectedRecords.length})` : '' }}
+            </el-button>
             <el-button type="primary" @click="showUploadDialog = true">
               <el-icon><Upload /></el-icon>
               上传录音
@@ -178,6 +185,7 @@
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="viewDetail(row.id)">详情</el-button>
+            <el-button link type="warning" v-if="row.status === 'transcribe_failed' || row.status === 'score_failed' || row.status === 'scored'" @click="handleRetry(row)">重试</el-button>
             <el-button link type="danger" @click="deleteRecord(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -390,6 +398,61 @@ async function viewDetail(id) {
   router.push(`/recordings/${id}`)
 }
 
+
+async function retryTranscribe(row) {
+  try {
+    await api.recording.triggerTranscribe(row.id)
+    ElMessage.success('已重新触发转写')
+    loadData()
+  } catch (e) {
+    ElMessage.error('重试转写失败')
+  }
+}
+
+async function handleRetry(row) {
+  if (row.status === 'transcribe_failed') {
+    retryTranscribe(row)
+  } else if (row.status === 'score_failed') {
+    retryScore(row)
+  } else if (row.status === 'scored') {
+    retryScored(row)
+  }
+}
+
+async function retryScore(row) {
+  try {
+    await api.recording.triggerScore(row.id)
+    ElMessage.success('已重新触发评分')
+    loadData()
+  } catch (e) {
+    ElMessage.error('重试评分失败')
+  }
+}
+
+async function retryScored(row) {
+  try {
+    await ElMessageBox.confirm('确定要重试该录音吗？将重新进行所有流程。', '提示')
+    await api.recording.batchRetry([row.id])
+    ElMessage.success('已提交重试任务')
+    loadData()
+  } catch (e) {
+    if (e !== 'cancel') console.error(e)
+  }
+}
+
+async function batchRetryRecords() {
+  if (selectedRecords.value.length === 0) return
+  try {
+    await ElMessageBox.confirm(`确定要重试选中的 ${selectedRecords.value.length} 条录音吗？将重新进行所有流程。`, '提示')
+    const ids = selectedRecords.value.map(r => r.id)
+    await api.recording.batchRetry(ids)
+    ElMessage.success(`已提交 ${ids.length} 条重试任务`)
+    selectedRecords.value = []
+    loadData()
+  } catch (e) {
+    if (e !== 'cancel') console.error(e)
+  }
+}
 
 async function deleteRecord(row) {
   try {

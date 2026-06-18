@@ -94,7 +94,12 @@ export default {
     }),
     delete: (id) => request.delete(`/recordings/${id}`),
     getScore: (id) => request.get(`/recordings/${id}/score`),
+    triggerTranscribe: (id) => request.post(`/recordings/${id}/transcribe`),
+    triggerScore: (id) => request.post(`/recordings/${id}/score`),
     getPlayUrl: (id) => request.get(`/recordings/${id}/play`),
+    retryTranscribe: (id) => request.post(`/recordings/${id}/transcribe`),
+    retryScore: (id) => request.post(`/recordings/${id}/score`),
+    batchRetry: (ids) => request.post('/recordings/batch-retry', ids),
   },
 
   statistics: {
