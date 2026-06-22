@@ -436,7 +436,10 @@ function renderAgentChart(data) {
   if (!agentChart && agentChartRef.value) {
     agentChart = echarts.init(agentChartRef.value)
   }
-  if (!data.length) return
+  if (!data.length) {
+    agentChart?.setOption({ series: [] })
+    return
+  }
 
   const names = data.map(d => d.agent_name.slice(0, 6))
 
@@ -513,6 +516,7 @@ function renderAgentChart(data) {
       const p = params[0]
       return `${p.name}<br/>${p.value}${unit}`
     } },
+    legend: { show: false },
     grid: { left: 60, right: 20, top: 20, bottom: 30 },
     xAxis: { type: 'value', name: dimLabelMap[agentSortBy.value] },
     yAxis: { type: 'category', data: names.reverse(), name: '坐席' },

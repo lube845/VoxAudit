@@ -58,11 +58,6 @@
             {{ formatSize(row.total_storage_bytes) }}
           </template>
         </el-table-column>
-        <el-table-column label="通过率" width="100">
-          <template #default="{ row }">
-            {{ calcPassRate(row) }}%
-          </template>
-        </el-table-column>
         <el-table-column label="操作" width="120" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" size="small" link @click="showUserDetail(row)">
@@ -259,15 +254,6 @@ function getPassRateColor(rate) {
   if (rate >= 80) return '#67C23A'
   if (rate >= 60) return '#E6A23C'
   return '#F56C6C'
-}
-
-function calcPassRate(user) {
-  if (!user.score_distribution) return 0
-  const dist = user.score_distribution
-  const total = Object.values(dist).reduce((a, b) => a + b, 0)
-  if (total === 0) return 0
-  const passed = (dist['60-70'] || 0) + (dist['70-80'] || 0) + (dist['80-90'] || 0) + (dist['90-100'] || 0)
-  return Math.round((passed / total) * 100)
 }
 
 async function loadOverview() {

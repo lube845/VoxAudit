@@ -1,7 +1,7 @@
 <template>
   <div class="login-container">
     <div class="login-box">
-      <h1 class="title">VoxAudit 评分规则管理系统</h1>
+      <h1 class="title">智能语音质检系统</h1>
       <el-form ref="formRef" :model="form" :rules="rules" class="login-form">
         <el-form-item prop="loginid">
           <el-input
