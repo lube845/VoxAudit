@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     DB_PORT: int = 3306
     DB_USER: str = ""
     DB_PASSWORD: str = ""
+    DB_PASSWORD_ENCRYPTED: str = ""
+    DB_SECRET_KEY: str = ""
     DB_NAME: str = ""
 
     @property
@@ -90,10 +92,31 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_required(self) -> "Settings":
-        """启动时校验必填配置"""
+        """启动时校验必填配置，并对密文密码进行解密"""
+        # DB_PASSWORD_ENCRYPTED 以 "enc:" 开头则视为密文，使用 Fernet 解密；
+        # 否则视为明文，直接使用。
+        raw = self.DB_PASSWORD_ENCRYPTED or ""
+        if raw.startswith("enc:"):
+            if not self.DB_SECRET_KEY:
+                raise ValueError(
+                    "DB_PASSWORD_ENCRYPTED 以 'enc:' 开头时必须同时设置 DB_SECRET_KEY"
+                )
+            try:
+                from cryptography.fernet import Fernet, InvalidToken
+                fernet = Fernet(self.DB_SECRET_KEY.encode("utf-8"))
+                self.DB_PASSWORD = fernet.decrypt(
+                    raw[4:].encode("utf-8")
+                ).decode("utf-8")
+            except InvalidToken:
+                raise ValueError(
+                    "DB_PASSWORD_ENCRYPTED 解密失败：DB_SECRET_KEY 不正确或密文已损坏"
+                )
+        else:
+            self.DB_PASSWORD = raw
+
         missing = []
         if not self.DB_PASSWORD:
-            missing.append("DB_PASSWORD")
+            missing.append("DB_PASSWORD_ENCRYPTED")
         if not self.SECRET_KEY:
             missing.append("SECRET_KEY")
         if not self.ADMIN_PASSWORD:

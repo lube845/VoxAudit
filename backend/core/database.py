@@ -1,6 +1,8 @@
 """
 数据库连接和会话管理
 """
+import urllib.parse
+from loguru import logger
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
@@ -39,8 +41,37 @@ async def get_db():
             await session.close()
 
 
+async def ensure_database_exists():
+    """检查目标数据库是否存在，不存在则自动创建"""
+    encoded_password = urllib.parse.quote_plus(settings.DB_PASSWORD)
+    server_url = (
+        f"mysql+aiomysql://{settings.DB_USER}:{encoded_password}"
+        f"@{settings.DB_HOST}:{settings.DB_PORT}/"
+    )
+    server_engine = create_async_engine(server_url, echo=False, poolclass=NullPool)
+    try:
+        async with server_engine.begin() as conn:
+            result = await conn.execute(
+                text("SHOW DATABASES LIKE :db_name"),
+                {"db_name": settings.DB_NAME},
+            )
+            if not result.fetchone():
+                logger.info(f"目标数据库 {settings.DB_NAME} 不存在，正在自动创建...")
+                await conn.execute(text(
+                    f"CREATE DATABASE `{settings.DB_NAME}` "
+                    f"CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+                ))
+                logger.info(f"目标数据库 {settings.DB_NAME} 创建成功")
+            else:
+                logger.info(f"目标数据库 {settings.DB_NAME} 已存在")
+    finally:
+        await server_engine.dispose()
+
+
 async def init_db():
     """初始化数据库结构"""
+    await ensure_database_exists()
+
     async with engine.begin() as conn:
         # 先创建表结构
         await conn.run_sync(Base.metadata.create_all)
