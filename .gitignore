@@ -126,7 +126,6 @@ temp/
 # ------------------
 # OA Auth (sensitive - contains keys)
 # ------------------
-docker/oa_auth.py
 backend/oa_auth.py
 
 # ------------------
