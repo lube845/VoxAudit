@@ -124,11 +124,6 @@ temp/
 .cache/
 
 # ------------------
-# OA Auth (sensitive - contains keys)
-# ------------------
-backend/oa_auth.py
-
-# ------------------
 # Backend
 # ------------------
 backend/migrations/versions/
