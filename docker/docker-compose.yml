@@ -61,18 +61,20 @@ services:
       timeout: 20s
       retries: 3
 
-  # 前端服务
+  # 前端服务 (开发模式 - 热更新)
   frontend:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.frontend
+    image: node:20-alpine
     container_name: voxaudit_frontend
+    working_dir: /app
     env_file:
       - .env
     ports:
-      - "${FRONTEND_EXTERNAL_PORT:-8888}:80"
+      - "${FRONTEND_EXTERNAL_PORT:-8888}:8888"
     networks:
       - voxaudit_network
+    volumes:
+      - ../frontend:/app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
 
 volumes:
   mysql_data:

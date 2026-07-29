@@ -4,6 +4,7 @@ VoxAudit 规则管理服务 - 主入口
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
+from fastapi.exceptions import RequestValidationError
 from contextlib import asynccontextmanager
 import time
 import os
@@ -12,7 +13,7 @@ from loguru import logger
 from backend.core.config import settings
 from backend.core.database import init_db
 from backend.services.oss_service import oss_service
-from backend.api import rule_router, history_router, recording_router, statistics_router, export_router, auth_router, storage_router, user_stats_router
+from backend.api import rule_router, history_router, recording_router, statistics_router, export_router, auth_router, storage_router, user_stats_router, system_settings_router
 
 
 @asynccontextmanager
@@ -69,6 +70,32 @@ async def global_exception_handler(request, exc):
     )
 
 
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    """把 Pydantic 验证错误转成中文友好提示"""
+    field_names = {
+        "speaker_detection": "客服/客户区分",
+        "rule_refine": "规则细化",
+        "bonus_judgment": "加分规则判定",
+        "deduction_judgment": "减分规则判定",
+    }
+    errors = []
+    for err in exc.errors():
+        loc = err.get("loc")
+        if loc and len(loc) > 1:
+            field_key = str(loc[1])
+            field_label = field_names.get(field_key, field_key)
+            errors.append(f"{field_label}的prompt过短（最少10个字）")
+        else:
+            errors.append(err.get("msg", "验证失败"))
+
+    message = "；".join(errors) if errors else "验证失败"
+    return JSONResponse(
+        status_code=422,
+        content={"detail": message},
+    )
+
+
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "version": settings.APP_VERSION}
@@ -83,6 +110,7 @@ app.include_router(export_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(storage_router, prefix="/api/v1")
 app.include_router(user_stats_router, prefix="/api/v1")
+app.include_router(system_settings_router, prefix="/api/v1")
 
 
 @app.get("/")

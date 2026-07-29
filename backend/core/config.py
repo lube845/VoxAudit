@@ -111,8 +111,9 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "DB_PASSWORD_ENCRYPTED 解密失败：DB_SECRET_KEY 不正确或密文已损坏"
                 )
-        else:
+        elif raw:
             self.DB_PASSWORD = raw
+        # else: DB_PASSWORD 已通过字段默认值或环境变量设置，保持不变
 
         missing = []
         if not self.DB_PASSWORD:

@@ -53,6 +53,12 @@ const routes = [
         name: 'UserStats',
         component: () => import('@/views/UserStats.vue'),
         meta: { requiresAdmin: true }
+      },
+      {
+        path: '/system-settings',
+        name: 'SystemSettings',
+        component: () => import('@/views/SystemSettings.vue'),
+        meta: { requiresAdmin: true }
       }
     ]
   }

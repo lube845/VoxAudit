@@ -10,7 +10,7 @@ class ScoringRuleBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     code: str = Field(..., min_length=1, max_length=50)
     version: str = Field(..., min_length=1, max_length=20)
-    description: Optional[str] = Field(None, max_length=500)
+    description: Optional[str] = Field(None, max_length=1500)
     total_score: float = 100.0
     rule_type: str = "bonus"
     is_veto: bool = False
@@ -39,3 +39,12 @@ class ScoringRuleResponse(ScoringRuleBase):
 
     class Config:
         from_attributes = True
+
+
+class RuleRefineRequest(BaseModel):
+    description: str = Field(..., min_length=1, max_length=1500, description="待细化的规则描述")
+    rule_type: Optional[str] = Field("bonus", description="规则类型：bonus=加分规则，deduction=扣分规则")
+
+
+class RuleRefineResponse(BaseModel):
+    refined_description: str = Field(..., description="细化后的规则描述")

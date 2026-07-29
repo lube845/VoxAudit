@@ -68,6 +68,7 @@ export default {
     getVersion: (versionId) => request.get(`/rules/history/${versionId}`),
     rollback: (ruleId, versionId) => request.post(`/rules/${ruleId}/rollback/${versionId}`),
     deleteVersion: (ruleId, versionId) => request.delete(`/rules/${ruleId}/history/${versionId}`),
+    refineDescription: (data) => request.post('/rules/refine-description', data),
   },
 
   recording: {
@@ -132,5 +133,17 @@ export default {
     getOverview: (params) => request.get('/statistics/users/overview', { params }),
     getUsersList: (params) => request.get('/statistics/users/list', { params }),
     getUserDetail: (loginid, params) => request.get(`/statistics/users/${loginid}/detail`, { params }),
+  },
+
+  systemSettings: {
+    getConfig: () => request.get('/system-settings/config'),
+    getLlmConfig: () => request.get('/system-settings/config/llm'),
+    updateLlmConfig: (data) => request.put('/system-settings/config/llm', data),
+    updateAsrConfig: (data) => request.put('/system-settings/config/asr', data),
+    testLlmConfig: (data) => request.post('/system-settings/config/llm/test', data),
+    testAsrConfig: (data) => request.post('/system-settings/config/asr/test', data),
+    getPrompts: () => request.get('/system-settings/prompts'),
+    updatePrompts: (data) => request.put('/system-settings/prompts', data),
+    resetPrompts: () => request.post('/system-settings/prompts/reset'),
   }
 }

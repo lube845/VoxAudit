@@ -14,11 +14,11 @@ export default defineConfig({
     port: 8888,
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://voxaudit_backend:8000',
         changeOrigin: true
       },
       '/upload_rules_template.json': {
-        target: 'http://localhost:8000',
+        target: 'http://voxaudit_backend:8000',
         changeOrigin: true
       }
     }

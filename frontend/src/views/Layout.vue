@@ -42,6 +42,10 @@
           <el-icon><User /></el-icon>
           <template #title>用户统计</template>
         </el-menu-item>
+        <el-menu-item v-if="isAdmin" index="/system-settings">
+          <el-icon><Tools /></el-icon>
+          <template #title>系统设置</template>
+        </el-menu-item>
       </el-menu>
     </el-aside>
 
@@ -67,7 +71,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Setting, Microphone, HomeFilled, Download, Delete, User } from '@element-plus/icons-vue'
+import { Setting, Microphone, HomeFilled, Download, Delete, User, Tools } from '@element-plus/icons-vue'
 import { now, formatDate } from '@/utils/timezone'
 import api from '@/api'
 

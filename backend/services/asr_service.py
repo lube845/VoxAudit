@@ -7,15 +7,32 @@ import httpx
 from typing import List, Dict
 
 from backend.core.config import settings
+from backend.services.config_service import config_service
 
 
 class ASRService:
     """ASR转写服务 - FunASR API"""
 
     def __init__(self):
-        self.api_url = settings.ASR_API_URL
-        self.api_key = settings.ASR_API_KEY
+        self.api_url = None
+        self.api_key = None
         self.timeout = 600  # 10分钟超时
+
+    async def _load_config(self):
+        """从数据库加载配置"""
+        config = await config_service.get_asr_config()
+        self.api_url = config["api_url"]
+        self.api_key = config["api_key"]
+
+        # 加载LLM配置（用于角色检测）
+        llm_config = await config_service.get_llm_config()
+        self.llm_api_url = llm_config["api_endpoint"]
+        self.llm_api_key = llm_config["api_key"]
+        self.llm_model = llm_config["model"]
+
+        # 加载Prompt模板
+        prompts = await config_service.get_all_prompts()
+        self.prompt_speaker_detection = prompts["prompt_speaker_detection"]
 
     async def transcribe(
         self,
@@ -32,6 +49,7 @@ class ASRService:
         Returns:
             转写结果，包含全文和分片段
         """
+        await self._load_config()
         if not self.api_url:
             raise Exception("ASR API URL 未配置")
 
@@ -91,11 +109,10 @@ class ASRService:
             text = seg.get("text", "")
             dialogue_lines.append("[" + speaker + "]: " + text)
         dialogue_text = "\n".join(dialogue_lines)
-        prompt = f"""以下是一段客服通话录音转写，已识别出{len(speakers)}个说话人。
-转写内容：
-{dialogue_text}
-判断哪个是坐席哪个是客户，只返回JSON格式：
-{{"speaker_roles": {{"speaker_0": "agent"或"customer", ...}}}}"""
+        prompt = self.prompt_speaker_detection.format(
+            speaker_count=len(speakers),
+            dialogue_text=dialogue_text,
+        )
         def _try_parse_json(text: str):
             """尝试解析JSON，自动修复常见格式错误"""
             try:
@@ -119,12 +136,21 @@ class ASRService:
             speaker_roles = role_info.get("speaker_roles", {})
             customer_map = {}
             customer_counter = 0
+            unknown_map = {}
+            unknown_counter = 0
             for seg in segments:
                 original_speaker = seg.get("speaker", "unknown")
                 role = speaker_roles.get(original_speaker, "customer")
                 if role == "agent":
                     seg["speaker"] = "agent"
                     seg["speaker_name"] = "坐席"
+                elif role == "unknown":
+                    if original_speaker not in unknown_map:
+                        unknown_counter += 1
+                        unknown_map[original_speaker] = unknown_counter
+                    unknown_num = unknown_map[original_speaker]
+                    seg["speaker"] = "unknown_" + str(unknown_num)
+                    seg["speaker_name"] = "未知" + str(unknown_num)
                 else:
                     if original_speaker not in customer_map:
                         customer_counter += 1
@@ -150,8 +176,12 @@ class ASRService:
                 logging.warning(f"LLM角色判断失败：LLM返回格式无效JSON ({error_type}: {error_msg})")
             else:
                 logging.warning(f"LLM角色判断失败：{error_type}: {error_msg}")
+            # Fallback: speaker_0 -> 坐席，其余 -> 客户
+            logging.info(f"Speaker role fallback applied: speaker_0=agent, others numbered as customers")
             customer_map = {}
             customer_counter = 0
+            unknown_map = {}
+            unknown_counter = 0
             for seg in segments:
                 if seg.get("speaker") == "speaker_0":
                     seg["speaker"] = "agent"
@@ -185,18 +215,18 @@ class ASRService:
 
     async def _call_llm(self, prompt):
         """调用LLM API"""
-        if not settings.LLM_API_ENDPOINT:
+        if not self.llm_api_url:
             raise Exception("LLM API Endpoint 未配置")
-        headers = {"Authorization": "Bearer " + settings.LLM_API_KEY, "Content-Type": "application/json"} if settings.LLM_API_KEY else {"Content-Type": "application/json"}
+        headers = {"Authorization": "Bearer " + self.llm_api_key, "Content-Type": "application/json"} if self.llm_api_key else {"Content-Type": "application/json"}
         payload = {
-            "model": settings.LLM_MODEL,
+            "model": self.llm_model,
             "messages": [{"role": "user", "content": prompt}],
             "max_tokens": 1024,
             "chat_template_kwargs": {"enable_thinking": False},
             "stream": False,
         }
         async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.post(settings.LLM_API_ENDPOINT, headers=headers, json=payload)
+            response = await client.post(self.llm_api_url, headers=headers, json=payload)
             response.raise_for_status()
             result = response.json()
             text = result["choices"][0]["message"].get("content") or ""

@@ -10,15 +10,35 @@ from datetime import datetime
 
 from backend.core.config import settings
 from backend.models.rule import ScoringRule
+from backend.services.config_service import config_service
 
 
 class AIScoringService:
     """AI评分服务"""
 
     def __init__(self):
-        self.api_key = settings.LLM_API_KEY
-        self.model = settings.LLM_MODEL
+        self.api_key = None
+        self.model = None
+        self.api_endpoint = None
+        self.temperature = None
+        self.max_tokens = None
+        self.json_retry_count = None
         self.timeout = 120  # 2分钟超时
+
+    async def _load_config(self):
+        """从数据库加载配置"""
+        config = await config_service.get_llm_config()
+        self.api_key = config["api_key"]
+        self.model = config["model"]
+        self.api_endpoint = config["api_endpoint"]
+        self.temperature = config["temperature"]
+        self.max_tokens = config["max_tokens"]
+        self.json_retry_count = config["json_retry_count"]
+
+        # 加载Prompt模板
+        prompts = await config_service.get_all_prompts()
+        self.prompt_bonus = prompts["prompt_bonus_judgment"]
+        self.prompt_deduction = prompts["prompt_deduction_judgment"]
 
     async def score(
         self,
@@ -38,7 +58,8 @@ class AIScoringService:
         Returns:
             评分结果
         """
-        if not settings.LLM_API_ENDPOINT:
+        await self._load_config()
+        if not self.api_endpoint:
             raise Exception("LLM API URL未配置")
 
         # 直接使用 scoring_rules 的字段构建规则信息
@@ -94,7 +115,7 @@ class AIScoringService:
             return {"total_score": 0, "total_max_score": 0, "details": [], "warnings": []}
 
         prompt = self._build_bonus_prompt(transcript, segments, bonus_items)
-        retry_count = settings.LLM_JSON_RETRY_COUNT
+        retry_count = self.json_retry_count
         last_error = None
 
         for attempt in range(retry_count):
@@ -122,7 +143,7 @@ class AIScoringService:
             return {"total_score": 0, "total_max_score": 0, "details": [], "warnings": []}
 
         prompt = self._build_deduction_prompt(transcript, segments, deduction_items)
-        retry_count = settings.LLM_JSON_RETRY_COUNT
+        retry_count = self.json_retry_count
         last_error = None
 
         for attempt in range(retry_count):
@@ -153,14 +174,14 @@ class AIScoringService:
                 {"role": "system", "content": "你是一个专业的金融催收录音质检专家，负责对催收对话进行评分。"},
                 {"role": "user", "content": prompt},
             ],
-            "temperature": settings.LLM_TEMPERATURE,
-            "max_tokens": settings.LLM_MAX_TOKENS,
+            "temperature": self.temperature,
+            "max_tokens": self.max_tokens,
             "chat_template_kwargs": {"enable_thinking": False},
             "stream": False,
         }
 
-        endpoint = settings.LLM_API_ENDPOINT
-        logger.info(f"调用LLM评分 API: {endpoint}, Model: {self.model}, Temperature: {settings.LLM_TEMPERATURE}, MaxTokens: {settings.LLM_MAX_TOKENS}")
+        endpoint = self.api_endpoint
+        logger.info(f"调用LLM评分 API: {endpoint}, Model: {self.model}, Temperature: {self.temperature}, MaxTokens: {self.max_tokens}")
 
         last_error = None
         for attempt in range(max_retries):
@@ -206,36 +227,11 @@ class AIScoringService:
     ) -> str:
         """构建加分规则评分提示词"""
         rules_json = json.dumps(bonus_items, ensure_ascii=False, indent=2)
-
-        return f"""## 录音转写文本
-{transcript}
-
-## 对话片段详情（带时间戳）
-{json.dumps(segments, ensure_ascii=False, indent=2)}
-
-## 加分规则
-{rules_json}
-
-## 评分要求
-请仔细阅读转写文本和对话片段，判断坐席的表现是否匹配加分规则。
-- 如果坐席的表现符合某条加分规则的description描述，则标记为"matched"，该规则得满分
-- 如果坐席的表现不符合某条加分规则，则标记为"not_matched"，不得分（但不扣分）
-
-## 输出格式要求（JSON）：
-{{
-    "items": [
-        {{
-            "code": "规则代码",
-            "status": "matched/not_matched",
-            "score": 得分（匹配则得满分，否则得0分）,
-            "matched_text": "匹配到的文本（未匹配则为空字符串）",
-            "reason": "评分理由"
-        }}
-    ],
-    "warnings": ["风险预警列表，如有则填入，否则为空数组"]
-}}
-
-请严格按照上述JSON格式输出，不要包含其他内容。"""
+        return self.prompt_bonus.format(
+            transcript=transcript,
+            segments=json.dumps(segments, ensure_ascii=False, indent=2),
+            rules_json=rules_json,
+        )
 
     def _build_deduction_prompt(
         self,
@@ -245,38 +241,11 @@ class AIScoringService:
     ) -> str:
         """构建减分规则评分提示词"""
         rules_json = json.dumps(deduction_items, ensure_ascii=False, indent=2)
-
-        return f"""## 录音转写文本
-{transcript}
-
-## 对话片段详情（带时间戳）
-{json.dumps(segments, ensure_ascii=False, indent=2)}
-
-## 减分规则
-{rules_json}
-
-## 评分要求
-请仔细阅读转写文本和对话片段，判断坐席的表现是否触犯减分规则。
-- 如果坐席的行为违反了某条减分规则的description描述，则标记为"matched"，按该规则扣分
-- 如果坐席的行为没有违反某条减分规则，则标记为"not_matched"，不扣分
-
-注意：扣分不超过规则设定的max_score。
-
-## 输出格式要求（JSON）：
-{{
-    "items": [
-        {{
-            "code": "规则代码",
-            "status": "matched/not_matched",
-            "score": 扣分数（匹配则扣除相应分数，否则得0分）,
-            "matched_text": "违规的文本（未违规则为空字符串）",
-            "reason": "扣分理由"
-        }}
-    ],
-    "warnings": ["风险预警列表，如有则填入，否则为空数组"]
-}}
-
-请严格按照上述JSON格式输出，不要包含其他内容。"""
+        return self.prompt_deduction.format(
+            transcript=transcript,
+            segments=json.dumps(segments, ensure_ascii=False, indent=2),
+            rules_json=rules_json,
+        )
 
     def _parse_bonus_result(
         self,
@@ -285,7 +254,7 @@ class AIScoringService:
     ) -> Dict:
         """解析加分规则评分结果"""
         try:
-            logger.info(f"[LLM原始输出] bonus: {content[:2000] if content else '空内容'}")
+            logger.info(f"[LLM原始输出] bonus: {content if content else '空内容'}")
             result = self._extract_json(content)
             items_result = result.get("items", [])
             warnings = result.get("warnings", [])
@@ -338,7 +307,7 @@ class AIScoringService:
     ) -> Dict:
         """解析减分规则评分结果"""
         try:
-            logger.info(f"[LLM原始输出] deduction: {content[:2000] if content else '空内容'}")
+            logger.info(f"[LLM原始输出] deduction: {content if content else '空内容'}")
             result = self._extract_json(content)
             items_result = result.get("items", [])
             warnings = result.get("warnings", [])
@@ -355,8 +324,7 @@ class AIScoringService:
                 )
 
                 if item_result and item_result.get("status") == "matched":
-                    deduction = abs(item_result.get("score", item["max_score"]))
-                    deduction = min(deduction, item["max_score"])
+                    deduction = item["max_score"]
                 else:
                     deduction = 0
 

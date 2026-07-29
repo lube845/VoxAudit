@@ -238,7 +238,15 @@
           <el-input-number v-model="form.total_score" :min="0" :max="100" :precision="1" />
         </el-form-item>
         <el-form-item label="描述" prop="description">
-          <el-input v-model="form.description" type="textarea" rows="3" placeholder="规则描述必填，越清晰越好，大模型根据该字段来理解规则" maxlength="500" show-word-limit />
+          <div class="description-textarea-wrapper">
+            <el-input v-model="form.description" type="textarea" rows="3" placeholder="规则描述必填，越清晰越好，大模型根据该字段来理解规则" maxlength="1500" show-word-limit />
+            <el-button class="expand-btn" :icon="Expand" text @click="openExpandDialog" title="放大编辑" />
+          </div>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" plain @click="refineDescription" :loading="refiningDescription" :icon="MagicStick">
+            AI细化描述
+          </el-button>
         </el-form-item>
         <el-form-item v-if="form.rule_type === 'deduction'" label="否决项">
           <el-switch v-model="form.is_veto" active-color="#f56c6c" inactive-color="#909399" />
@@ -250,6 +258,49 @@
         <el-button type="primary" @click="submitForm" :loading="submitting">
           {{ editId ? '保存' : '创建' }}
         </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- AI细化预览对话框 -->
+    <el-dialog v-model="refineDialogVisible" title="AI细化结果预览" width="600px" destroy-on-close>
+      <div v-if="refinedContent" class="refine-preview">
+        <div class="original-text">
+          <div class="label">原始描述</div>
+          <div class="content">{{ form.description }}</div>
+        </div>
+        <div class="divider">
+          <el-icon><ArrowRight /></el-icon>
+        </div>
+        <div class="refined-text">
+          <div class="label">细化后描述</div>
+          <div class="content">{{ refinedContent }}</div>
+        </div>
+      </div>
+      <div v-else class="loading-text">
+        <el-icon class="is-loading"><Loading /></el-icon>
+        正在细化描述，请稍候...
+      </div>
+      <template #footer>
+        <el-button @click="refineDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="applyRefinedDescription" :disabled="!refinedContent">
+          应用细化结果
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 描述放大编辑对话框 -->
+    <el-dialog v-model="expandDialogVisible" title="编辑规则描述" width="700px" destroy-on-close>
+      <el-input
+        v-model="expandedDescription"
+        type="textarea"
+        :rows="12"
+        placeholder="请输入规则描述"
+        maxlength="1500"
+        show-word-limit
+      />
+      <template #footer>
+        <el-button @click="expandDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="applyExpandDescription">确定</el-button>
       </template>
     </el-dialog>
 
@@ -293,7 +344,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Plus, Download, Upload } from '@element-plus/icons-vue'
+import { Search, Plus, Download, Upload, MagicStick, ArrowRight, Loading, Expand } from '@element-plus/icons-vue'
 import { formatDate, getTimezone } from '@/utils/timezone'
 import api from '@/api'
 
@@ -316,6 +367,11 @@ const historyDialogVisible = ref(false)
 const importDialogVisible = ref(false)
 const editId = ref(null)
 const submitting = ref(false)
+const refiningDescription = ref(false)
+const refineDialogVisible = ref(false)
+const refinedContent = ref('')
+const expandDialogVisible = ref(false)
+const expandedDescription = ref('')
 const historyLoading = ref(false)
 const historyList = ref([])
 const currentRuleId = ref(null)
@@ -560,6 +616,44 @@ async function submitForm() {
   } finally {
     submitting.value = false
   }
+}
+
+async function refineDescription() {
+  if (!form.description || form.description.trim().length < 5) {
+    ElMessage.warning('请先输入至少5个字的规则描述')
+    return
+  }
+  refiningDescription.value = true
+  refinedContent.value = ''
+  try {
+    const res = await api.rule.refineDescription({
+      description: form.description,
+      rule_type: form.rule_type
+    })
+    refinedContent.value = res.refined_description
+    refineDialogVisible.value = true
+  } catch (e) {
+    console.error(e)
+  } finally {
+    refiningDescription.value = false
+  }
+}
+
+function applyRefinedDescription() {
+  if (refinedContent.value) {
+    form.description = refinedContent.value
+  }
+  refineDialogVisible.value = false
+}
+
+function openExpandDialog() {
+  expandedDescription.value = form.description || ''
+  expandDialogVisible.value = true
+}
+
+function applyExpandDescription() {
+  form.description = expandedDescription.value
+  expandDialogVisible.value = false
 }
 
 async function deleteRule(row) {
@@ -829,5 +923,79 @@ onMounted(() => {
 :deep(.el-dialog__footer) {
   padding: 10px 20px 20px;
   border-top: 1px solid #f0f0f0;
+}
+
+.refine-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.original-text, .refined-text {
+  background: #f5f7fa;
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+
+.original-text .label, .refined-text .label {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 6px;
+}
+
+.original-text .content {
+  color: #606266;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.refined-text .content {
+  color: #303133;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.refined-text {
+  background: #ecf5ff;
+  border: 1px solid #409eff30;
+}
+
+.divider {
+  display: flex;
+  justify-content: center;
+  color: #409eff;
+}
+
+.loading-text {
+  text-align: center;
+  padding: 40px;
+  color: #909399;
+}
+
+.description-textarea-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.description-textarea-wrapper :deep(.el-textarea) {
+  width: 100%;
+}
+
+.description-textarea-wrapper :deep(.el-textarea__inner) {
+  padding-right: 40px;
+}
+
+.expand-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  padding: 4px !important;
+  min-height: auto !important;
+  color: #909399 !important;
+}
+
+.expand-btn:hover {
+  color: #409eff !important;
 }
 </style>
