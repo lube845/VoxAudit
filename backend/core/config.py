@@ -33,11 +33,6 @@ class Settings(BaseSettings):
         encoded_password = urllib.parse.quote_plus(self.DB_PASSWORD)
         return f"mysql+pymysql://{self.DB_USER}:{encoded_password}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
 
-    # JWT配置
-    SECRET_KEY: str = ""
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
-
     # OSS配置
     OSS_ENDPOINT: str = ""
     OSS_ACCESS_KEY: str = ""
@@ -118,8 +113,6 @@ class Settings(BaseSettings):
         missing = []
         if not self.DB_PASSWORD:
             missing.append("DB_PASSWORD_ENCRYPTED")
-        if not self.SECRET_KEY:
-            missing.append("SECRET_KEY")
         if not self.ADMIN_PASSWORD:
             missing.append("ADMIN_PASSWORD")
         if missing:
