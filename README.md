@@ -63,8 +63,6 @@
 ### 环境要求
 
 - Docker & Docker Compose
-- MySQL 8.0+
-- Python 3.11+ (本地开发)
 
 ### 部署
 
@@ -73,27 +71,30 @@
 cp docker/.env.example docker/.env
 # 编辑 docker/.env 填入实际配置
 
-# 2. 启动服务
+# 2. 启动服务 (首次构建较慢)
 cd docker
-docker-compose up -d
+docker-compose up -d --build
 
 # 3. 访问系统
 # 前端: http://localhost:8888
 # 后端API: http://localhost:8000
+# API文档: http://localhost:8000/docs
 ```
 
-### 本地开发
+### 常用命令
 
 ```bash
-# 后端
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload
+# 查看服务状态
+docker-compose -f docker/docker-compose.yml ps
 
-# 前端
-cd frontend
-npm install
-npm run dev
+# 查看后端日志
+docker-compose -f docker/docker-compose.yml logs -f backend
+
+# 重启服务
+docker-compose -f docker/docker-compose.yml restart
+
+# 停止并删除容器
+docker-compose -f docker/docker-compose.yml down
 ```
 
 ## 项目结构
@@ -107,16 +108,16 @@ VoxAudit/
 │   ├── schemas/             # Pydantic 模型
 │   ├── services/            # 业务服务（AI评分/ASR/OSS）
 │   └── main.py              # 应用入口
-├── frontend/               # 前端应用
+├── frontend/                # 前端应用
 │   ├── src/
 │   │   ├── api/             # Axios 封装
 │   │   ├── views/           # 页面组件
-│   │   └── router/           # 路由配置
+│   │   └── router/          # 路由配置
 │   └── package.json
 ├── docker/                  # Docker 配置
 │   ├── docker-compose.yml   # 编排配置
 │   ├── Dockerfile.backend   # 后端镜像
-│   ├── Dockerfile.frontend  # 前端镜像
+│   ├── Dockerfile.frontend  # 前端镜像 (Nginx)
 │   └── nginx.conf           # Nginx 配置
 └── docs/                    # 设计文档
 ```

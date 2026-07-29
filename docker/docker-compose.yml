@@ -41,7 +41,7 @@ services:
       - voxaudit_network
     volumes:
       - ..:/workspace
-    command: sh -c "python -c 'import asyncio; from backend.core.database import init_db; from backend.core.seed import seed_data; asyncio.run(init_db()); asyncio.run(seed_data())' && python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload"
+    command: sh -c "python -c 'import asyncio; from backend.core.database import init_db; from backend.core.seed import seed_data; asyncio.run(init_db()); asyncio.run(seed_data())' && python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000"
 
   # MinIO对象存储
   minio:
@@ -61,20 +61,18 @@ services:
       timeout: 20s
       retries: 3
 
-  # 前端服务 (开发模式 - 热更新)
+  # 前端服务 (生产模式)
   frontend:
-    image: node:20-alpine
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
     container_name: voxaudit_frontend
-    working_dir: /app
-    env_file:
-      - .env
     ports:
-      - "${FRONTEND_EXTERNAL_PORT:-8888}:8888"
+      - "${FRONTEND_EXTERNAL_PORT:-8888}:80"
     networks:
       - voxaudit_network
-    volumes:
-      - ../frontend:/app
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    depends_on:
+      - backend
 
 volumes:
   mysql_data:
