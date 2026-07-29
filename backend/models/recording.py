@@ -54,6 +54,11 @@ class Recording(Base):
     transcript = Column(Text, nullable=True, comment="转写全文")
     transcript_segments = Column(JSON, nullable=True, comment="转写片段(带时间戳)")
 
+    # 声道模式配置
+    speaker_detection_method = Column(String(20), nullable=True, default="channel", comment="说话人检测方式: channel=声道分离, llm=大模型")
+    left_channel_role = Column(String(20), nullable=True, default="agent", comment="左声道角色: agent=坐席, customer=客户")
+    right_channel_role = Column(String(20), nullable=True, default="customer", comment="右声道角色: agent=坐席, customer=客户")
+
     # 评分结果
     total_score = Column(Float, nullable=True, comment="总分")
     bonus_score = Column(Float, default=0, comment="加分总分")

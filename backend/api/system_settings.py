@@ -30,6 +30,7 @@ class LLMConfig(BaseModel):
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
     json_retry_count: Optional[int] = None
+    enable_thinking: Optional[bool] = None
 
 
 class ASRConfig(BaseModel):
@@ -50,12 +51,18 @@ class TestResult(BaseModel):
     message: str
 
 
+class PromptItem(BaseModel):
+    """单个Prompt配置"""
+    system: Optional[str] = Field(default=None)
+    user: Optional[str] = Field(default=None)
+
+
 class PromptConfig(BaseModel):
     """Prompt配置"""
-    speaker_detection: Optional[str] = Field(default=None, min_length=10)
-    rule_refine: Optional[str] = Field(default=None, min_length=10)
-    bonus_judgment: Optional[str] = Field(default=None, min_length=10)
-    deduction_judgment: Optional[str] = Field(default=None, min_length=10)
+    speaker_detection: Optional[PromptItem] = None
+    rule_refine: Optional[PromptItem] = None
+    bonus_judgment: Optional[PromptItem] = None
+    deduction_judgment: Optional[PromptItem] = None
 
 
 async def get_setting(session: AsyncSessionLocal, key: str) -> Optional[str]:
@@ -97,6 +104,7 @@ async def get_system_config(current_user: dict = Depends(require_admin)):
         llm_temperature = await get_setting(session, "LLM_TEMPERATURE")
         llm_max_tokens = await get_setting(session, "LLM_MAX_TOKENS")
         llm_json_retry_count = await get_setting(session, "LLM_JSON_RETRY_COUNT")
+        llm_enable_thinking = await get_setting(session, "LLM_ENABLE_THINKING")
 
         asr_api_url = await get_setting(session, "ASR_API_URL")
         asr_api_key = await get_setting(session, "ASR_API_KEY")
@@ -109,6 +117,7 @@ async def get_system_config(current_user: dict = Depends(require_admin)):
                 temperature=float(llm_temperature) if llm_temperature else settings.LLM_TEMPERATURE,
                 max_tokens=int(llm_max_tokens) if llm_max_tokens else settings.LLM_MAX_TOKENS,
                 json_retry_count=int(llm_json_retry_count) if llm_json_retry_count else settings.LLM_JSON_RETRY_COUNT,
+                enable_thinking=llm_enable_thinking.lower() == "true" if llm_enable_thinking else False,
             ),
             asr=ASRConfig(
                 api_url=asr_api_url or settings.ASR_API_URL,
@@ -138,6 +147,8 @@ async def update_llm_config(
             await set_setting(session, "LLM_MAX_TOKENS", str(config.max_tokens), "大模型最大Token数")
         if config.json_retry_count is not None:
             await set_setting(session, "LLM_JSON_RETRY_COUNT", str(config.json_retry_count), "LLM JSON解析失败重试次数")
+        if config.enable_thinking is not None:
+            await set_setting(session, "LLM_ENABLE_THINKING", str(config.enable_thinking).lower(), "大模型深度思考开关")
 
         await session.commit()
         return {"message": "LLM配置更新成功"}
@@ -249,6 +260,7 @@ async def get_llm_config(current_user: dict = Depends(require_admin)):
         llm_temperature = await get_setting(session, "LLM_TEMPERATURE")
         llm_max_tokens = await get_setting(session, "LLM_MAX_TOKENS")
         llm_json_retry_count = await get_setting(session, "LLM_JSON_RETRY_COUNT")
+        llm_enable_thinking = await get_setting(session, "LLM_ENABLE_THINKING")
 
         return {
             "api_key": llm_api_key,
@@ -257,6 +269,7 @@ async def get_llm_config(current_user: dict = Depends(require_admin)):
             "temperature": float(llm_temperature) if llm_temperature else settings.LLM_TEMPERATURE,
             "max_tokens": int(llm_max_tokens) if llm_max_tokens else settings.LLM_MAX_TOKENS,
             "json_retry_count": int(llm_json_retry_count) if llm_json_retry_count else settings.LLM_JSON_RETRY_COUNT,
+            "enable_thinking": llm_enable_thinking.lower() == "true" if llm_enable_thinking else False,
         }
 
 
@@ -269,11 +282,16 @@ async def get_prompts(current_user: dict = Depends(require_admin)):
         result = await session.execute(select(SystemSettings))
         settings_dict = {s.key: s.value for s in result.scalars().all()}
 
+        def get_prompt_item(key: str, default: dict) -> PromptItem:
+            system = settings_dict.get(key + "_system") or default.get("system_prompt", "")
+            user = settings_dict.get(key + "_user") or default.get("user_prompt", "")
+            return PromptItem(system=system, user=user)
+
         return PromptConfig(
-            speaker_detection=settings_dict.get("prompt_speaker_detection") or DEFAULT_PROMPTS["prompt_speaker_detection"],
-            rule_refine=settings_dict.get("prompt_rule_refine") or DEFAULT_PROMPTS["prompt_rule_refine"],
-            bonus_judgment=settings_dict.get("prompt_bonus_judgment") or DEFAULT_PROMPTS["prompt_bonus_judgment"],
-            deduction_judgment=settings_dict.get("prompt_deduction_judgment") or DEFAULT_PROMPTS["prompt_deduction_judgment"],
+            speaker_detection=get_prompt_item("prompt_speaker_detection", DEFAULT_PROMPTS["prompt_speaker_detection"]),
+            rule_refine=get_prompt_item("prompt_rule_refine", DEFAULT_PROMPTS["prompt_rule_refine"]),
+            bonus_judgment=get_prompt_item("prompt_bonus_judgment", DEFAULT_PROMPTS["prompt_bonus_judgment"]),
+            deduction_judgment=get_prompt_item("prompt_deduction_judgment", DEFAULT_PROMPTS["prompt_deduction_judgment"]),
         )
 
 
@@ -287,13 +305,17 @@ async def update_prompts(
     """
     async with AsyncSessionLocal() as session:
         if config.speaker_detection is not None:
-            await set_setting(session, "prompt_speaker_detection", config.speaker_detection, "客服/客户区分Prompt")
+            await set_setting(session, "prompt_speaker_detection_system", config.speaker_detection.system, "客服/客户区分System Prompt")
+            await set_setting(session, "prompt_speaker_detection_user", config.speaker_detection.user, "客服/客户区分User Prompt")
         if config.rule_refine is not None:
-            await set_setting(session, "prompt_rule_refine", config.rule_refine, "规则细化Prompt")
+            await set_setting(session, "prompt_rule_refine_system", config.rule_refine.system, "规则细化System Prompt")
+            await set_setting(session, "prompt_rule_refine_user", config.rule_refine.user, "规则细化User Prompt")
         if config.bonus_judgment is not None:
-            await set_setting(session, "prompt_bonus_judgment", config.bonus_judgment, "加分规则判定Prompt")
+            await set_setting(session, "prompt_bonus_judgment_system", config.bonus_judgment.system, "加分规则判定System Prompt")
+            await set_setting(session, "prompt_bonus_judgment_user", config.bonus_judgment.user, "加分规则判定User Prompt")
         if config.deduction_judgment is not None:
-            await set_setting(session, "prompt_deduction_judgment", config.deduction_judgment, "减分规则判定Prompt")
+            await set_setting(session, "prompt_deduction_judgment_system", config.deduction_judgment.system, "减分规则判定System Prompt")
+            await set_setting(session, "prompt_deduction_judgment_user", config.deduction_judgment.user, "减分规则判定User Prompt")
 
         await session.commit()
         return {"message": "Prompt配置更新成功"}
@@ -306,6 +328,7 @@ async def reset_prompts(current_user: dict = Depends(require_admin)):
     """
     async with AsyncSessionLocal() as session:
         for key, value in DEFAULT_PROMPTS.items():
-            await set_setting(session, key, value, f"{key}默认模板")
+            await set_setting(session, key + "_system", value["system_prompt"], f"{key}默认System模板")
+            await set_setting(session, key + "_user", value["user_prompt"], f"{key}默认User模板")
         await session.commit()
         return {"message": "Prompt配置已重置为默认值"}

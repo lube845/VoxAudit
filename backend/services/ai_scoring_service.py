@@ -3,7 +3,6 @@ AI评分服务 - 简化版
 只用 scoring_rules 表的 total_score 和 description
 """
 import json
-import httpx
 from loguru import logger
 from typing import List, Dict, Optional, Any
 from datetime import datetime
@@ -11,6 +10,7 @@ from datetime import datetime
 from backend.core.config import settings
 from backend.models.rule import ScoringRule
 from backend.services.config_service import config_service
+from backend.services.llm_service import llm_service
 
 
 class AIScoringService:
@@ -37,8 +37,10 @@ class AIScoringService:
 
         # 加载Prompt模板
         prompts = await config_service.get_all_prompts()
-        self.prompt_bonus = prompts["prompt_bonus_judgment"]
-        self.prompt_deduction = prompts["prompt_deduction_judgment"]
+        self.prompt_bonus_system = prompts["prompt_bonus_judgment"].get("system_prompt", "")
+        self.prompt_bonus_user = prompts["prompt_bonus_judgment"].get("user_prompt", "")
+        self.prompt_deduction_system = prompts["prompt_deduction_judgment"].get("system_prompt", "")
+        self.prompt_deduction_user = prompts["prompt_deduction_judgment"].get("user_prompt", "")
 
     async def score(
         self,
@@ -115,12 +117,13 @@ class AIScoringService:
             return {"total_score": 0, "total_max_score": 0, "details": [], "warnings": []}
 
         prompt = self._build_bonus_prompt(transcript, segments, bonus_items)
+        system_message = self.prompt_bonus_system
         retry_count = self.json_retry_count
         last_error = None
 
         for attempt in range(retry_count):
             try:
-                content = await self._call_llm(prompt)
+                content = await self._call_llm(prompt, system_message=system_message)
                 return self._parse_bonus_result(content, bonus_items)
             except Exception as e:
                 last_error = e
@@ -143,12 +146,13 @@ class AIScoringService:
             return {"total_score": 0, "total_max_score": 0, "details": [], "warnings": []}
 
         prompt = self._build_deduction_prompt(transcript, segments, deduction_items)
+        system_message = self.prompt_deduction_system
         retry_count = self.json_retry_count
         last_error = None
 
         for attempt in range(retry_count):
             try:
-                content = await self._call_llm(prompt)
+                content = await self._call_llm(prompt, system_message=system_message)
                 return self._parse_deduction_result(content, deduction_items)
             except Exception as e:
                 last_error = e
@@ -160,64 +164,15 @@ class AIScoringService:
 
         raise last_error
 
-    async def _call_llm(self, prompt: str, max_retries: int = 3) -> str:
-        """调用LLM API，带自动重试机制"""
-        headers = {
-            "Content-Type": "application/json",
-        }
-        if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-
-        payload = {
-            "model": self.model,
-            "messages": [
-                {"role": "system", "content": "你是一个专业的金融催收录音质检专家，负责对催收对话进行评分。"},
-                {"role": "user", "content": prompt},
-            ],
-            "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
-            "chat_template_kwargs": {"enable_thinking": False},
-            "stream": False,
-        }
-
-        endpoint = self.api_endpoint
-        logger.info(f"调用LLM评分 API: {endpoint}, Model: {self.model}, Temperature: {self.temperature}, MaxTokens: {self.max_tokens}")
-
-        last_error = None
-        for attempt in range(max_retries):
-            try:
-                async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    response = await client.post(endpoint, headers=headers, json=payload)
-                    response.raise_for_status()
-                    result = response.json()
-                    logger.info(f"LLM API原始响应: {result}")
-                    # 检查API返回是否有效
-                    if result.get("choices") is None or len(result.get("choices", [])) == 0:
-                        error_msg = result.get("base_resp", {}).get("status_msg", "unknown error")
-                        raise Exception(f"AI评分失败: {error_msg}")
-                    message = result["choices"][0].get("message", {})
-                    # MiniMax 推理模型返回的内容可能在 reasoning_content 中
-                    content = message.get("content", "") or message.get("reasoning_content", "")
-                    if not content:
-                        raise Exception("AI评分返回内容为空")
-                    logger.info(f"LLM返回内容: {content}")
-                    return content
-            except httpx.TimeoutException:
-                raise Exception("AI评分超时")
-            except httpx.HTTPStatusError as e:
-                logger.error(f"LLM HTTP错误: {e.response.status_code} - {e.response.text}")
-                raise Exception(f"AI评分失败: {e.response.text}")
-            except Exception as e:
-                last_error = e
-                logger.warning(f"LLM调用失败 (尝试 {attempt + 1}/{max_retries}): {str(e)}")
-                if attempt < max_retries - 1:
-                    import asyncio
-                    await asyncio.sleep(2)  # 等待2秒后重试
-                    continue
-
-        # 所有重试都失败
-        logger.error(f"LLM评分失败，已重试{max_retries}次: {str(last_error)}")
-        raise Exception(f"AI评分失败，已重试{max_retries}次: {str(last_error)}")
+    async def _call_llm(self, prompt: str, system_message: Optional[str] = None, max_retries: int = 3) -> str:
+        """调用LLM API"""
+        return await llm_service.call(
+            prompt=prompt,
+            system_message=system_message,
+            max_tokens=self.max_tokens,
+            temperature=self.temperature,
+            max_retries=max_retries,
+        )
 
     def _build_bonus_prompt(
         self,
@@ -227,7 +182,7 @@ class AIScoringService:
     ) -> str:
         """构建加分规则评分提示词"""
         rules_json = json.dumps(bonus_items, ensure_ascii=False, indent=2)
-        return self.prompt_bonus.format(
+        return self.prompt_bonus_user.format(
             transcript=transcript,
             segments=json.dumps(segments, ensure_ascii=False, indent=2),
             rules_json=rules_json,
@@ -241,7 +196,7 @@ class AIScoringService:
     ) -> str:
         """构建减分规则评分提示词"""
         rules_json = json.dumps(deduction_items, ensure_ascii=False, indent=2)
-        return self.prompt_deduction.format(
+        return self.prompt_deduction_user.format(
             transcript=transcript,
             segments=json.dumps(segments, ensure_ascii=False, indent=2),
             rules_json=rules_json,

@@ -10,8 +10,8 @@ from typing import Optional
 class Settings(BaseSettings):
     """应用配置"""
 
-    APP_NAME: str = "VoxAudit 规则管理服务"
-    APP_VERSION: str = "1.0.0"
+    APP_NAME: str = "VoxAudit 语音管理系统"
+    APP_VERSION: str = "1.0.1"
     DEBUG: bool = False
 
     # 数据库配置
@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "MiniMax-M2-7"
     LLM_API_ENDPOINT: str = ""
     LLM_TEMPERATURE: float = 0.1
-    LLM_MAX_TOKENS: int = 2000
+    LLM_MAX_TOKENS: int = 20000
 
     # 超级管理员配置
     ADMIN_USER: str = ""

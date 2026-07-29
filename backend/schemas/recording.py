@@ -22,6 +22,10 @@ class RecordingInitUpload(BaseModel):
     agent_id: Optional[str] = None
     customer_phone: Optional[str] = None
     call_time: Optional[datetime] = None
+    # 说话人检测方式
+    speaker_detection_method: Optional[str] = "channel"  # "channel" | "llm"
+    left_channel_role: Optional[str] = "agent"  # 左声道角色
+    right_channel_role: Optional[str] = "customer"  # 右声道角色
 
 
 class RecordingUploadResponse(BaseModel):

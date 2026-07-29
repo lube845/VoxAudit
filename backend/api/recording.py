@@ -98,6 +98,9 @@ async def init_upload(
         status=RecordingStatus.UPLOADING,
         agent_name=data.agent_name,
         user_id=user_id,
+        speaker_detection_method=data.speaker_detection_method or "channel",
+        left_channel_role=data.left_channel_role or "agent",
+        right_channel_role=data.right_channel_role or "customer",
     )
     db.add(recording)
     await db.commit()
@@ -211,9 +214,13 @@ async def _transcribe_impl(
         recording.remark = "[步骤2/4] 正在调用ASR转写..."
         await db.commit()
         transcript_result = await asr_service.transcribe_with_role(
-            file_content, recording.file_name
+            file_content, recording.file_name,
+            left_channel_role=recording.left_channel_role,
+            right_channel_role=recording.right_channel_role,
         )
         recording.remark = f"[步骤2/4] ASR返回keys: {list(transcript_result.keys())}"
+        if transcript_result.get("mono_warn"):
+            recording.remark += " [警告] 检测到单声道音频，已自动切换为大模型模式"
         await db.commit()
 
         # 步骤3: 保存转写结果

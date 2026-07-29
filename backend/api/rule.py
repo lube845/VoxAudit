@@ -498,53 +498,18 @@ async def refine_rule_description(
     current_user: dict = Depends(get_current_user_required)
 ):
     """使用AI细化规则描述，使其更加清晰、具体、结构化"""
-    import httpx
     from backend.services.config_service import config_service
+    from backend.services.llm_service import llm_service
 
-    llm_config = await config_service.get_llm_config()
     prompt_template = await config_service.get_prompt("prompt_rule_refine")
-
-    if not llm_config["api_endpoint"]:
-        raise HTTPException(status_code=500, detail="LLM API未配置")
-
-    prompt = prompt_template.format(original_description=request.description)
-
-    headers = {"Content-Type": "application/json"}
-    if llm_config["api_key"]:
-        headers["Authorization"] = f"Bearer {llm_config['api_key']}"
-
-    payload = {
-        "model": llm_config["model"],
-        "messages": [
-            {"role": "system", "content": "你是一个专业的金融催收录音质检专家，负责将粗略的质检规则细化为清晰、具体的评分标准。"},
-            {"role": "user", "content": prompt},
-        ],
-        "temperature": llm_config["temperature"],
-        "max_tokens": 2000,
-        "chat_template_kwargs": {"enable_thinking": False},
-        "stream": False,
-    }
+    prompt = prompt_template.get("user_prompt", "").format(original_description=request.description)
+    system_message = prompt_template.get("system_prompt", "")
 
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.post(llm_config["api_endpoint"], headers=headers, json=payload)
-            response.raise_for_status()
-            result = response.json()
-
-            if result.get("choices") is None or len(result.get("choices", [])) == 0:
-                error_msg = result.get("base_resp", {}).get("status_msg", "unknown error")
-                raise HTTPException(status_code=500, detail=f"AI细化失败: {error_msg}")
-
-            message = result["choices"][0].get("message", {})
-            content = message.get("content", "") or message.get("reasoning_content", "")
-            if not content:
-                raise HTTPException(status_code=500, detail="AI返回内容为空")
-
-            return RuleRefineResponse(refined_description=content.strip())
-
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=500, detail="AI细化请求超时")
-    except httpx.HTTPStatusError as e:
-        raise HTTPException(status_code=500, detail=f"AI细化失败: {e.response.text}")
+        content = await llm_service.call(
+            prompt=prompt,
+            system_message=system_message,
+        )
+        return RuleRefineResponse(refined_description=content.strip())
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"AI细化失败: {str(e)}")

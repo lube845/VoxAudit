@@ -233,6 +233,28 @@
             </template>
           </el-upload>
         </el-form-item>
+        <el-form-item label="角色识别">
+          <el-radio-group v-model="uploadForm.speaker_detection_method" size="default">
+            <el-radio value="channel">声道分离</el-radio>
+            <el-radio value="llm">大模型判断</el-radio>
+          </el-radio-group>
+          <div class="form-tip">
+            <span v-if="uploadForm.speaker_detection_method === 'channel'">通过音频左右声道区分坐席和客户（需使用立体声录音）</span>
+            <span v-else>通过大模型分析转写内容判断说话人角色</span>
+          </div>
+        </el-form-item>
+        <el-form-item v-if="uploadForm.speaker_detection_method === 'channel'" label="左声道角色">
+          <el-radio-group v-model="uploadForm.left_channel_role" size="default">
+            <el-radio value="agent">坐席</el-radio>
+            <el-radio value="customer">客户</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="uploadForm.speaker_detection_method === 'channel'" label="右声道角色">
+          <el-radio-group v-model="uploadForm.right_channel_role" size="default">
+            <el-radio value="agent">坐席</el-radio>
+            <el-radio value="customer">客户</el-radio>
+          </el-radio-group>
+        </el-form-item>
         <el-form-item v-if="uploadQueue.length > 0" label="上传进度">
           <div class="upload-queue">
             <div v-for="(item, index) in uploadQueue" :key="index" class="upload-item">
@@ -298,7 +320,13 @@ const shortcuts = [
   { text: '近一年', value: () => [now().subtract(364, 'day').toDate(), now().toDate()] }
 ]
 
-const uploadForm = reactive({ agent_id: '', agent_name: '' })
+const uploadForm = reactive({
+  agent_id: '',
+  agent_name: '',
+  speaker_detection_method: 'channel',  // 'channel' | 'llm'
+  left_channel_role: 'agent',  // 'agent' | 'customer'
+  right_channel_role: 'customer',  // 'agent' | 'customer'
+})
 const uploadFormRef = ref(null)
 
 // 状态映射
@@ -586,6 +614,11 @@ function closeUploadDialog() {
 function resetUploadForm() {
   fileList.value = []
   uploadQueue.value = []
+  uploadForm.agent_id = ''
+  uploadForm.agent_name = ''
+  uploadForm.speaker_detection_method = 'channel'
+  uploadForm.left_channel_role = 'agent'
+  uploadForm.right_channel_role = 'customer'
   if (uploadFormRef.value) uploadFormRef.value.resetFields()
 }
 
@@ -617,7 +650,10 @@ async function handleUpload() {
         file_size: file.size,
         file_md5: file_md5,
         file_type: file.name.split('.').pop().toLowerCase(),
-        agent_name: uploadForm.agent_name
+        agent_name: uploadForm.agent_name,
+        speaker_detection_method: uploadForm.speaker_detection_method,
+        left_channel_role: uploadForm.left_channel_role,
+        right_channel_role: uploadForm.right_channel_role,
       })
 
       if (initRes.exists) {
@@ -766,6 +802,13 @@ onMounted(() => {
 .upload-dragger .el-upload__text em {
   color: #409eff;
   font-style: normal;
+}
+
+.form-tip {
+  color: #909399;
+  font-size: 12px;
+  margin-top: 4px;
+  line-height: 1.4;
 }
 
 .upload-tip {

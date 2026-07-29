@@ -3,11 +3,13 @@ ASR转写服务 - 基于 FunASR API
 """
 import json
 import re
+import io
 import httpx
 from typing import List, Dict
 
 from backend.core.config import settings
 from backend.services.config_service import config_service
+from backend.services.llm_service import llm_service
 
 
 class ASRService:
@@ -24,6 +26,11 @@ class ASRService:
         self.api_url = config["api_url"]
         self.api_key = config["api_key"]
 
+        # 声道模式配置
+        self.channel_mode = config.get("channel_mode", "channel")  # "channel" | "llm"
+        self.left_channel_role = config.get("left_channel_role", "agent")
+        self.right_channel_role = config.get("right_channel_role", "customer")
+
         # 加载LLM配置（用于角色检测）
         llm_config = await config_service.get_llm_config()
         self.llm_api_url = llm_config["api_endpoint"]
@@ -32,7 +39,8 @@ class ASRService:
 
         # 加载Prompt模板
         prompts = await config_service.get_all_prompts()
-        self.prompt_speaker_detection = prompts["prompt_speaker_detection"]
+        self.prompt_speaker_system = prompts["prompt_speaker_detection"].get("system_prompt", "")
+        self.prompt_speaker_user = prompts["prompt_speaker_detection"].get("user_prompt", "")
 
     async def transcribe(
         self,
@@ -78,14 +86,170 @@ class ASRService:
         self,
         file_content: bytes,
         filename: str = "audio.wav",
+        force_method: str = None,
+        left_channel_role: str = None,
+        right_channel_role: str = None,
     ) -> Dict:
-        """转写并使用LLM判断说话人角色"""
+        """转写并判断说话人角色（根据配置自动选择方式）
+
+        Args:
+            file_content: 音频文件内容
+            filename: 文件名
+            force_method: 强制使用的方法 "channel" | "llm"，默认为None（根据配置）
+            left_channel_role: 左声道角色覆盖（可选）
+            right_channel_role: 右声道角色覆盖（可选）
+        """
+        await self._load_config()
+
+        if force_method is None:
+            method = self.channel_mode
+        else:
+            method = force_method
+
+        # 使用传入的覆盖值，否则使用配置值
+        left_role = left_channel_role or self.left_channel_role
+        right_role = right_channel_role or self.right_channel_role
+
+        if method == "llm":
+            return await self._transcribe_with_role_llm(file_content, filename)
+        else:
+            return await self._transcribe_with_channel(file_content, filename, left_role, right_role)
+
+    async def _transcribe_with_channel(
+        self,
+        file_content: bytes,
+        filename: str = "audio.wav",
+        left_channel_role: str = "agent",
+        right_channel_role: str = "customer",
+    ) -> Dict:
+        """使用声道分离进行转写（不依赖LLM判断角色）"""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        try:
+            # 1. 分离左右声道
+            left_audio, right_audio, is_mono = await self._split_stereo_channels(file_content, filename)
+            logger.info(f"[ASR] 声道分离完成，左声道: {len(left_audio)} bytes，右声道: {len(right_audio)} bytes")
+        except Exception as e:
+            logger.warning(f"[ASR] 声道分离失败，降级到LLM模式: {e}")
+            return await self._transcribe_with_role_llm(file_content, filename)
+
+        # 单声道音频无法使用声道分离，降级到LLM模式
+        if is_mono:
+            logger.warning(f"[ASR] 检测到单声道音频，无法使用声道分离，降级到LLM模式")
+            result = await self._transcribe_with_role_llm(file_content, filename)
+            result["mono_warn"] = True
+            return result
+
+        # 2. 分别转写
+        try:
+            left_result = await self._transcribe_single_channel(left_audio, "left.wav")
+            right_result = await self._transcribe_single_channel(right_audio, "right.wav")
+        except Exception as e:
+            logger.warning(f"[ASR] 声道转写失败，降级到LLM模式: {e}")
+            return await self._transcribe_with_role_llm(file_content, filename)
+
+        # 3. 合并结果，按时间排序
+        segments = self._merge_channel_segments(
+            left_result, right_result,
+            left_channel_role, right_channel_role
+        )
+
+        full_text = "\n".join([
+            seg["speaker_name"] + ": " + seg["text"]
+            for seg in segments
+        ])
+
+        return {
+            "full_text": full_text,
+            "segments": segments,
+            "speaker_cnt": 2,
+            "channel_mode": True,
+            "mono_warn": False,
+        }
+
+    async def _split_stereo_channels(self, file_content: bytes, filename: str) -> tuple:
+        """分离立体声音频的左右声道
+
+        Returns:
+            (left_audio, right_audio, is_mono): 左右声道音频数据，是否为单声道
+        """
+        from pydub import AudioSegment
+
+        audio = AudioSegment.from_file(io.BytesIO(file_content))
+
+        if audio.channels < 2:
+            # 单声道音频，左右声道使用相同音频
+            return file_content, file_content, True
+
+        # 分离声道
+        channels = audio.split_to_mono()
+        left = channels[0]
+        right = channels[1]
+
+        # 导出为bytes
+        left_io = io.BytesIO()
+        right_io = io.BytesIO()
+        left.export(left_io, format="wav")
+        right.export(right_io, format="wav")
+
+        return left_io.getvalue(), right_io.getvalue(), False
+
+    async def _transcribe_single_channel(self, audio_content: bytes, filename: str) -> Dict:
+        """转写单个声道音频"""
+        result = await self.transcribe(audio_content, filename)
+        return result
+
+    def _merge_channel_segments(
+        self,
+        left_result: Dict,
+        right_result: Dict,
+        left_role: str,
+        right_role: str
+    ) -> List[Dict]:
+        """合并左右声道转写结果，按时间排序"""
+        segments = []
+
+        left_segments = left_result.get("segments", [])
+        right_segments = right_result.get("segments", [])
+
+        # 角色映射
+        role_map = {
+            "agent": ("agent", "坐席"),
+            "customer": ("customer", "客户"),
+        }
+        left_speaker, left_name = role_map.get(left_role, ("unknown", f"未知-{left_role}"))
+        right_speaker, right_name = role_map.get(right_role, ("unknown", f"未知-{right_role}"))
+
+        # 为左声道片段设置角色
+        for seg in left_segments:
+            seg["speaker"] = left_speaker
+            seg["speaker_name"] = left_name
+
+        # 为右声道片段设置角色
+        for seg in right_segments:
+            seg["speaker"] = right_speaker
+            seg["speaker_name"] = right_name
+
+        # 合并并按开始时间排序
+        all_segments = left_segments + right_segments
+        all_segments.sort(key=lambda x: x.get("start_time", 0))
+
+        return all_segments
+
+    async def _transcribe_with_role_llm(
+        self,
+        file_content: bytes,
+        filename: str = "audio.wav",
+    ) -> Dict:
+        """使用LLM判断说话人角色（原有逻辑）"""
         result = await self.transcribe(file_content, filename)
         result["segments"] = await self._detect_speaker_roles(result["segments"])
         result["full_text"] = "\n".join([
             seg["speaker_name"] + ": " + seg["text"]
             for seg in result["segments"]
         ])
+        result["channel_mode"] = False
         return result
 
     async def _detect_speaker_roles(self, segments, db=None):
@@ -109,10 +273,11 @@ class ASRService:
             text = seg.get("text", "")
             dialogue_lines.append("[" + speaker + "]: " + text)
         dialogue_text = "\n".join(dialogue_lines)
-        prompt = self.prompt_speaker_detection.format(
+        prompt = self.prompt_speaker_user.format(
             speaker_count=len(speakers),
             dialogue_text=dialogue_text,
         )
+        system_message = self.prompt_speaker_system
         def _try_parse_json(text: str):
             """尝试解析JSON，自动修复常见格式错误"""
             try:
@@ -129,7 +294,7 @@ class ASRService:
                     return None
 
         try:
-            role_result = await self._call_llm(prompt)
+            role_result = await self._call_llm(prompt, system_message=system_message)
             role_info = _try_parse_json(role_result)
             if role_info is None:
                 raise Exception("JSON解析失败")
@@ -213,26 +378,13 @@ class ASRService:
 
         return text
 
-    async def _call_llm(self, prompt):
+    async def _call_llm(self, prompt, system_message: str = None):
         """调用LLM API"""
-        if not self.llm_api_url:
-            raise Exception("LLM API Endpoint 未配置")
-        headers = {"Authorization": "Bearer " + self.llm_api_key, "Content-Type": "application/json"} if self.llm_api_key else {"Content-Type": "application/json"}
-        payload = {
-            "model": self.llm_model,
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 1024,
-            "chat_template_kwargs": {"enable_thinking": False},
-            "stream": False,
-        }
-        async with httpx.AsyncClient(timeout=60) as client:
-            response = await client.post(self.llm_api_url, headers=headers, json=payload)
-            response.raise_for_status()
-            result = response.json()
-            text = result["choices"][0]["message"].get("content") or ""
-            if not text:
-                raise Exception("LLM返回内容为空")
-            return self._extract_json(text)
+        content = await llm_service.call(
+            prompt=prompt,
+            system_message=system_message,
+        )
+        return self._extract_json(content)
 
     def _parse_transcript_result(self, result: Dict) -> Dict:
         """解析ASR返回的Markdown结果"""

@@ -10,10 +10,11 @@ from backend.models.system_settings import SystemSettings
 
 # 默认 Prompt 模板
 DEFAULT_PROMPTS = {
-    "prompt_speaker_detection": """你是一名资深的催收对话质检专员，任务是根据通话转写内容，判断每个说话人对应的角色：坐席（催收人员）还是客户。
+    "prompt_speaker_detection": {
+        "system_prompt": """你是一名资深的催收对话质检专员，任务是根据通话转写内容，判断每个说话人对应的角色：坐席（催收人员）还是客户。
 
 【背景】
-这是一段催收场景的外呼录音转写，已通过声纹识别切分出 {speaker_count} 个说话人。转写中可能包含"开始录音""通话结束"等系统提示音被误转写为文本的情况，判断时请忽略这类内容，不要作为角色依据。
+这是一段催收场景的外呼录音转写，转写中可能包含"开始录音""通话结束"等系统提示音被误转写为文本的情况，判断时请忽略这类内容，不要作为角色依据。
 
 【判断依据，按优先级参考】
 1. 身份表述：主动报出机构名称、工号、"是XX本人吗"等确认身份用语的，通常是坐席；应答"我是"、反问"你是哪里的"的，通常是客户
@@ -28,24 +29,24 @@ DEFAULT_PROMPTS = {
 - 如果内容过短或信息不足以支撑判断，请标记为"unknown"，不要强行猜测
 - 一通对话中坐席角色是唯一的，如果超过2个说话人，请判断是否存在插入/串音的干扰说话人
 
-【转写内容】
-{dialogue_text}
-
 【输出要求】
 只返回如下JSON格式，不要输出任何额外说明文字：
-{{
-  "speaker_roles": {{
+{
+  "speaker_roles": {
     "speaker_0": "agent" 或 "customer" 或 "unknown",
     ...
-  }},
+  },
   "confidence": "high" 或 "medium" 或 "low",
   "reasoning": "简要说明判断依据，30-50字以内，若有特殊情况（转接/代接/信息不足）请注明"
-}}""",
-
-    "prompt_rule_refine": """你是一名专业的金融催收录音质检专家，负责将业务人员提供的粗略质检规则描述，细化为结构清晰、可直接用于大模型评分的标准化规则。
-
-## 原始规则描述
-{original_description}
+}""",
+    "user_prompt": """
+已通过声纹识别切分出 {speaker_count} 个说话人，请通过转写内容输出结果：
+【转写内容】
+{dialogue_text}
+"""
+    },
+    "prompt_rule_refine": {
+        "system_prompt": """你是一名专业的金融催收录音质检专家，负责将业务人员提供的粗略质检规则描述，细化为结构清晰、可直接用于大模型评分的标准化规则。
 
 ## 细化任务
 请围绕原始规则描述，从以下维度进行细化。注意：只做"细化"和"结构化"，不要引入原描述中没有的判断逻辑，不要扩大或缩小规则的判断范围。
@@ -70,17 +71,13 @@ DEFAULT_PROMPTS = {
 【触发条件】具体识别逻辑的完整说明，150字以内
 【正面示例】1.示例话术或场景1；2.示例话术或场景2；3.示例话术或场景3
 【负面示例】1.易混淆但不命中的场景1；2.易混淆但不命中的场景2""",
+        "user_prompt": """
+## 原始规则描述
+{original_description}"""
+    },
+    "prompt_bonus_judgment": {
+        "system_prompt": """你是一名专业的金融催收录音质检专家，负责根据标准化加分规则，逐条判断坐席在本次通话中的表现是否命中。
 
-    "prompt_bonus_judgment": """你是一名专业的金融催收录音质检专家，负责根据标准化加分规则，逐条判断坐席在本次通话中的表现是否命中。
-
-## 录音转写文本
-{transcript}
-
-## 对话片段详情
-{segments}
-
-## 加分规则
-{rules_json}
 
 ## 评分原则
 
@@ -111,30 +108,30 @@ DEFAULT_PROMPTS = {
 如无上述情况，返回空数组，不要为了填充而输出无意义内容。
 
 ## 输出格式要求（JSON）
-{{
+{
     "items": [
-        {{
+        {
             "code": "规则代码",
             "status": "matched" 或 "not_matched",
             "matched_text": "命中的原文证据；未命中则为空字符串",
             "reason": "评分理由，需说明依据触发条件的哪个部分得出结论，30-60字"
-        }}
+        }
     ],
     "warnings": ["风险预警描述，如有则填入，否则为空数组"]
-}}
+}
 
 请严格按照上述JSON格式输出，不要包含Markdown代码块标记或其他任何额外文字。""",
-
-    "prompt_deduction_judgment": """你是一名专业的金融催收录音质检专家，负责根据标准化减分规则，逐条判断坐席在本次通话中的表现是否存在违规行为。
-
-## 录音转写文本
+        "user_prompt": """## 录音转写文本
 {transcript}
 
 ## 对话片段详情
 {segments}
 
-## 减分规则
-{rules_json}
+## 加分规则
+{rules_json}"""
+    },
+    "prompt_deduction_judgment": {
+        "system_prompt": """你是一名专业的金融催收录音质检专家，负责根据标准化减分规则，逐条判断坐席在本次通话中的表现是否存在违规行为。
 
 ## 评分原则
 
@@ -166,19 +163,28 @@ DEFAULT_PROMPTS = {
 如无上述情况，返回空数组，不要为了填充而输出无意义内容。
 
 ## 输出格式要求（JSON）
-{{
+{
     "items": [
-        {{
+        {
             "code": "规则代码",
             "status": "matched" 或 "not_matched",
             "matched_text": "违规的原文证据；未违规则为空字符串",
             "reason": "扣分理由，需说明依据触发条件的哪个部分得出结论，30-60字"
-        }}
+        }
     ],
     "warnings": ["风险预警描述，如有则填入，否则为空数组"]
-}}
+}
 
-请严格按照上述JSON格式输出，不要包含Markdown代码块标记或其他任何额外文字。"""
+请严格按照上述JSON格式输出，不要包含Markdown代码块标记或其他任何额外文字。""",
+        "user_prompt": """## 录音转写文本
+{transcript}
+
+## 对话片段详情
+{segments}
+
+## 减分规则
+{rules_json}"""
+    }
 }
 
 
@@ -209,6 +215,7 @@ class ConfigService:
             "temperature": float(settings_dict.get("LLM_TEMPERATURE") or default_settings.LLM_TEMPERATURE),
             "max_tokens": int(settings_dict.get("LLM_MAX_TOKENS") or default_settings.LLM_MAX_TOKENS),
             "json_retry_count": int(settings_dict.get("LLM_JSON_RETRY_COUNT") or default_settings.LLM_JSON_RETRY_COUNT),
+            "enable_thinking": settings_dict.get("LLM_ENABLE_THINKING", "false").lower() == "true",
         }
 
     @staticmethod
@@ -221,19 +228,32 @@ class ConfigService:
         return {
             "api_url": settings_dict.get("ASR_API_URL") or default_settings.ASR_API_URL,
             "api_key": settings_dict.get("ASR_API_KEY") or default_settings.ASR_API_KEY,
+            # 声道模式配置
+            "channel_mode": settings_dict.get("ASR_CHANNEL_MODE") or "channel",
+            "left_channel_role": settings_dict.get("ASR_LEFT_CHANNEL_ROLE") or "agent",
+            "right_channel_role": settings_dict.get("ASR_RIGHT_CHANNEL_ROLE") or "customer",
         }
 
     @staticmethod
-    async def get_prompt(prompt_key: str) -> str:
+    async def get_prompt(prompt_key: str) -> dict:
         """获取Prompt模板，优先从数据库读取，没有则用默认值"""
         async with AsyncSessionLocal() as session:
+            system_key = prompt_key + "_system"
+            user_key = prompt_key + "_user"
             result = await session.execute(
-                select(SystemSettings).where(SystemSettings.key == prompt_key)
+                select(SystemSettings).where(SystemSettings.key.in_([system_key, user_key]))
             )
-            setting = result.scalar_one_or_none()
-            if setting and setting.value:
-                return setting.value
-        return DEFAULT_PROMPTS.get(prompt_key, "")
+            settings = {s.key: s.value for s in result.scalars().all()}
+            system_value = settings.get(system_key)
+            user_value = settings.get(user_key)
+            if system_value is not None or user_value is not None:
+                return {
+                    "system_prompt": system_value or "",
+                    "user_prompt": user_value or "",
+                }
+        # 回退到默认
+        default = DEFAULT_PROMPTS.get(prompt_key, {"system_prompt": "你是一个好助手", "user_prompt": "回答用户问题"})
+        return default
 
     @staticmethod
     async def get_all_prompts() -> dict:

@@ -54,6 +54,11 @@
             <el-form-item label="模型重试次数">
               <el-input-number v-model="llmForm.json_retry_count" :min="1" :max="10" />
             </el-form-item>
+
+            <el-form-item label="深度思考">
+              <el-switch v-model="llmForm.enable_thinking" />
+              <span class="form-tip" style="margin-left: 12px;">启用后模型会进行推理思考，但响应会更慢</span>
+            </el-form-item>
           </el-form>
 
           <div class="card-footer">
@@ -78,7 +83,7 @@
           <template #header>
             <div class="card-title">
               <el-icon class="card-icon"><Document /></el-icon>
-              <span>当前生效配置（数据库）</span>
+              <span>当前生效配置</span>
             </div>
           </template>
           <div class="config-preview">
@@ -103,9 +108,9 @@
               <span class="preview-value">{{ currentLlmConfig.json_retry_count }} 次</span>
             </div>
             <div class="preview-item">
-              <span class="preview-label">API密钥</span>
-              <el-tag :type="currentLlmConfig.api_key ? 'success' : 'info'" size="small">
-                {{ currentLlmConfig.api_key ? '已设置' : '未设置' }}
+              <span class="preview-label">深度思考</span>
+              <el-tag :type="currentLlmConfig.enable_thinking ? 'success' : 'info'" size="small">
+                {{ currentLlmConfig.enable_thinking ? '已启用' : '未启用' }}
               </el-tag>
             </div>
           </div>
@@ -166,7 +171,7 @@
           <template #header>
             <div class="card-title">
               <el-icon class="card-icon"><Document /></el-icon>
-              <span>当前生效配置（数据库）</span>
+              <span>当前生效配置</span>
             </div>
           </template>
           <div class="config-preview">
@@ -208,43 +213,80 @@
 
           <el-form :model="promptForm" label-width="140px" label-position="left" class="prompt-form">
             <el-form-item label="客服/客户区分">
-              <el-input
-                v-model="promptForm.speaker_detection"
-                type="textarea"
-                :rows="6"
-                placeholder="用于区分录音中说话人是坐席还是客户的Prompt模板"
-              />
-              <div class="form-tip">模板变量：{speaker_count}（说话人数量）、{dialogue_text}（对话内容）</div>
+              <div class="prompt-section">
+                <div class="prompt-label">System Prompt</div>
+                <el-input
+                  v-model="promptForm.speaker_detection.system"
+                  type="textarea"
+                  :rows="6"
+                  placeholder="系统角色设定"
+                />
+                <div class="prompt-label" style="margin-top: 12px;">User Prompt</div>
+                <el-input
+                  v-model="promptForm.speaker_detection.user"
+                  type="textarea"
+                  :rows="4"
+                  placeholder="用户输入模板"
+                />
+                <div class="form-tip">模板变量：{speaker_count}（说话人数量）、{dialogue_text}（对话内容）</div>
+              </div>
             </el-form-item>
 
             <el-form-item label="规则细化">
-              <el-input
-                v-model="promptForm.rule_refine"
-                type="textarea"
-                :rows="6"
-                placeholder="用于将粗略规则细化为结构化规则的Prompt模板"
-              />
-              <div class="form-tip">模板变量：{original_description}（原始规则描述）</div>
+              <div class="prompt-section">
+                <div class="prompt-label">System Prompt</div>
+                <el-input
+                  v-model="promptForm.rule_refine.system"
+                  type="textarea"
+                  :rows="6"
+                  placeholder="系统角色设定"
+                />
+                <div class="prompt-label" style="margin-top: 12px;">User Prompt</div>
+                <el-input
+                  v-model="promptForm.rule_refine.user"
+                  type="textarea"
+                  :rows="4"
+                  placeholder="用户输入模板，变量：{original_description}"
+                />
+              </div>
             </el-form-item>
 
             <el-form-item label="加分规则判定">
-              <el-input
-                v-model="promptForm.bonus_judgment"
-                type="textarea"
-                :rows="10"
-                placeholder="用于判断录音是否命中加分规则的Prompt模板"
-              />
-              <div class="form-tip">模板变量：{transcript}（转写文本）、{segments}（对话片段）、{rules_json}（规则JSON）</div>
+              <div class="prompt-section">
+                <div class="prompt-label">System Prompt</div>
+                <el-input
+                  v-model="promptForm.bonus_judgment.system"
+                  type="textarea"
+                  :rows="8"
+                  placeholder="系统角色设定和评分原则"
+                />
+                <div class="prompt-label" style="margin-top: 12px;">User Prompt</div>
+                <el-input
+                  v-model="promptForm.bonus_judgment.user"
+                  type="textarea"
+                  :rows="4"
+                  placeholder="用户输入模板，变量：{transcript}、{segments}、{rules_json}"
+                />
+              </div>
             </el-form-item>
 
             <el-form-item label="减分规则判定">
-              <el-input
-                v-model="promptForm.deduction_judgment"
-                type="textarea"
-                :rows="10"
-                placeholder="用于判断录音是否命中减分规则的Prompt模板"
-              />
-              <div class="form-tip">模板变量：{transcript}（转写文本）、{segments}（对话片段）、{rules_json}（规则JSON）</div>
+              <div class="prompt-section">
+                <div class="prompt-label">System Prompt</div>
+                <el-input
+                  v-model="promptForm.deduction_judgment.system"
+                  type="textarea"
+                  :rows="8"
+                  placeholder="系统角色设定和评分原则"
+                />
+                <div class="prompt-label" style="margin-top: 12px;">User Prompt</div>
+                <el-input
+                  v-model="promptForm.deduction_judgment.user"
+                  type="textarea"
+                  :rows="4"
+                  placeholder="用户输入模板，变量：{transcript}、{segments}、{rules_json}"
+                />
+              </div>
             </el-form-item>
           </el-form>
         </el-card>
@@ -279,6 +321,7 @@ const llmForm = ref({
   temperature: 0.1,
   max_tokens: 2000,
   json_retry_count: 3,
+  enable_thinking: false,
 })
 
 const asrForm = ref({
@@ -288,10 +331,11 @@ const asrForm = ref({
 
 // 默认 Prompt 模板
 const DEFAULT_PROMPTS = {
-  speaker_detection: `你是一名资深的催收对话质检专员，任务是根据通话转写内容，判断每个speaker对应的角色：坐席（催收人员）还是客户（欠款人/家属/第三方）。
+  speaker_detection: {
+    system: `你是一名资深的催收对话质检专员，任务是根据通话转写内容，判断每个说话人对应的角色：坐席（催收人员）还是客户。
 
 【背景】
-这是一段催收场景的外呼录音转写，已通过声纹识别切分出 {len(speakers)} 个speaker。转写中可能包含"开始录音""通话结束"等系统提示音被误转写为文本的情况，判断时请忽略这类内容，不要作为角色依据。
+这是一段催收场景的外呼录音转写，转写中可能包含"开始录音""通话结束"等系统提示音被误转写为文本的情况，判断时请忽略这类内容，不要作为角色依据。
 
 【判断依据，按优先级参考】
 1. 身份表述：主动报出机构名称、工号、"是XX本人吗"等确认身份用语的，通常是坐席；应答"我是"、反问"你是哪里的"的，通常是客户
@@ -304,26 +348,24 @@ const DEFAULT_PROMPTS = {
 - 如果某个说话人的发言内容全部是环境音、提示音或无实际语义的碎片，请在reasoning中说明，并将该说话人标记为"unknown"
 - 如果对话涉及转接（如"我帮您转接家属"）或非本人接听（如家属代接），请在reasoning中特别说明这一情况
 - 如果内容过短或信息不足以支撑判断，请标记为"unknown"，不要强行猜测
-- 一通对话中坐席角色是唯一的，如果超过2个speaker，请判断是否存在插入/串音的干扰speaker
-
-【转写内容】
-{dialogue_text}
+- 一通对话中坐席角色是唯一的，如果超过2个说话人，请判断是否存在插入/串音的干扰说话人
 
 【输出要求】
 只返回如下JSON格式，不要输出任何额外说明文字：
-{{
-  "speaker_roles": {{
+{
+  "speaker_roles": {
     "speaker_0": "agent" 或 "customer" 或 "unknown",
     ...
-  }},
+  },
   "confidence": "high" 或 "medium" 或 "low",
   "reasoning": "简要说明判断依据，30-50字以内，若有特殊情况（转接/代接/信息不足）请注明"
-}}`,
-
-  rule_refine: `你是一名专业的金融催收录音质检专家，负责将业务人员提供的粗略质检规则描述，细化为结构清晰、可直接用于大模型评分的标准化规则。
-
-## 原始规则描述
-{request.description}
+}`,
+    user: `已通过声纹识别切分出 {speaker_count} 个说话人，请通过转写内容输出结果：
+【转写内容】
+{dialogue_text}`
+  },
+  rule_refine: {
+    system: `你是一名专业的金融催收录音质检专家，负责将业务人员提供的粗略质检规则描述，细化为结构清晰、可直接用于大模型评分的标准化规则。
 
 ## 细化任务
 请围绕原始规则描述，从以下维度进行细化。注意：只做"细化"和"结构化"，不要引入原描述中没有的判断逻辑，不要扩大或缩小规则的判断范围。
@@ -348,17 +390,12 @@ const DEFAULT_PROMPTS = {
 【触发条件】具体识别逻辑的完整说明，150字以内
 【正面示例】1.示例话术或场景1；2.示例话术或场景2；3.示例话术或场景3
 【负面示例】1.易混淆但不命中的场景1；2.易混淆但不命中的场景2`,
+    user: `## 原始规则描述
+{original_description}`
+  },
+  bonus_judgment: {
+    system: `你是一名专业的金融催收录音质检专家，负责根据标准化加分规则，逐条判断坐席在本次通话中的表现是否命中。
 
-  bonus_judgment: `你是一名专业的金融催收录音质检专家，负责根据标准化加分规则，逐条判断坐席在本次通话中的表现是否命中。
-
-## 录音转写文本
-{transcript}
-
-## 对话片段详情
-{json.dumps(segments, ensure_ascii=False, indent=2)}
-
-## 加分规则
-{rules_json}
 
 ## 评分原则
 
@@ -376,7 +413,7 @@ const DEFAULT_PROMPTS = {
 
 5. **证据来源约束（重要）**：
    - \`matched_text\`必须是转写文本或对话片段中**真实出现的原文片段**，禁止改写、总结或编造
-   - 如果需结合上下文才能判断，\`matched_text\`可以填入多个片段并用"..."分隔，但每个片段都必须真实存在
+   - 如果需结合上下文才能判断，\`matched_text\`只用填入一个真实存在的原文片段
    - 如果找不到明确的原文证据支撑matched，不能标记为matched，即使你认为坐席"整体做到了"
 
 6. **宁缺勿滥**：证据不充分、表述模糊、无法确定是否达到规则要求时，一律判定为"not_matched"，不要主观推测坐席意图
@@ -389,30 +426,30 @@ const DEFAULT_PROMPTS = {
 如无上述情况，返回空数组，不要为了填充而输出无意义内容。
 
 ## 输出格式要求（JSON）
-{{
+{
     "items": [
-        {{
+        {
             "code": "规则代码",
             "status": "matched" 或 "not_matched",
-            "matched_text": "命中的原文证据，多处用...分隔；未命中则为空字符串",
+            "matched_text": "命中的原文证据；未命中则为空字符串",
             "reason": "评分理由，需说明依据触发条件的哪个部分得出结论，30-60字"
-        }}
+        }
     ],
     "warnings": ["风险预警描述，如有则填入，否则为空数组"]
-}}
+}
 
 请严格按照上述JSON格式输出，不要包含Markdown代码块标记或其他任何额外文字。`,
-
-  deduction_judgment: `你是一名专业的金融催收录音质检专家，负责根据标准化减分规则，逐条判断坐席在本次通话中的表现是否存在违规行为。
-
-## 录音转写文本
+    user: `## 录音转写文本
 {transcript}
 
 ## 对话片段详情
-{json.dumps(segments, ensure_ascii=False, indent=2)}
+{segments}
 
-## 减分规则
-{rules_json}
+## 加分规则
+{rules_json}`
+  },
+  deduction_judgment: {
+    system: `你是一名专业的金融催收录音质检专家，负责根据标准化减分规则，逐条判断坐席在本次通话中的表现是否存在违规行为。
 
 ## 评分原则
 
@@ -444,24 +481,43 @@ const DEFAULT_PROMPTS = {
 如无上述情况，返回空数组，不要为了填充而输出无意义内容。
 
 ## 输出格式要求（JSON）
-{{
+{
     "items": [
-        {{
+        {
             "code": "规则代码",
             "status": "matched" 或 "not_matched",
-            "matched_text": "违规的原文证据，多处用...分隔；未违规则为空字符串",
+            "matched_text": "违规的原文证据；未违规则为空字符串",
             "reason": "扣分理由，需说明依据触发条件的哪个部分得出结论，30-60字"
-        }}
+        }
     ],
     "warnings": ["风险预警描述，如有则填入，否则为空数组"]
-}}
-
-请严格按照上述JSON格式输出，不要包含Markdown代码块标记或其他任何额外文字。`,
 }
 
-const promptForm = ref({ ...DEFAULT_PROMPTS })
+请严格按照上述JSON格式输出，不要包含Markdown代码块标记或其他任何额外文字。`,
+    user: `## 录音转写文本
+{transcript}
 
-const promptFormDefault = ref({ ...DEFAULT_PROMPTS })
+## 对话片段详情
+{segments}
+
+## 减分规则
+{rules_json}`
+  }
+}
+
+const promptForm = ref({
+  speaker_detection: { system: DEFAULT_PROMPTS.speaker_detection.system, user: DEFAULT_PROMPTS.speaker_detection.user },
+  rule_refine: { system: DEFAULT_PROMPTS.rule_refine.system, user: DEFAULT_PROMPTS.rule_refine.user },
+  bonus_judgment: { system: DEFAULT_PROMPTS.bonus_judgment.system, user: DEFAULT_PROMPTS.bonus_judgment.user },
+  deduction_judgment: { system: DEFAULT_PROMPTS.deduction_judgment.system, user: DEFAULT_PROMPTS.deduction_judgment.user },
+})
+
+const promptFormDefault = ref({
+  speaker_detection: { system: DEFAULT_PROMPTS.speaker_detection.system, user: DEFAULT_PROMPTS.speaker_detection.user },
+  rule_refine: { system: DEFAULT_PROMPTS.rule_refine.system, user: DEFAULT_PROMPTS.rule_refine.user },
+  bonus_judgment: { system: DEFAULT_PROMPTS.bonus_judgment.system, user: DEFAULT_PROMPTS.bonus_judgment.user },
+  deduction_judgment: { system: DEFAULT_PROMPTS.deduction_judgment.system, user: DEFAULT_PROMPTS.deduction_judgment.user },
+})
 
 const currentLlmConfig = ref({})
 const currentAsrConfig = ref({})
@@ -472,6 +528,7 @@ const hasLlmChanges = computed(() => {
     llmForm.value.temperature !== currentLlmConfig.value.temperature ||
     llmForm.value.max_tokens !== currentLlmConfig.value.max_tokens ||
     llmForm.value.json_retry_count !== currentLlmConfig.value.json_retry_count ||
+    llmForm.value.enable_thinking !== currentLlmConfig.value.enable_thinking ||
     llmForm.value.api_key !== ''
 })
 
@@ -481,10 +538,14 @@ const hasAsrChanges = computed(() => {
 })
 
 const hasPromptChanges = computed(() => {
-  return promptForm.value.speaker_detection !== promptFormDefault.value.speaker_detection ||
-    promptForm.value.rule_refine !== promptFormDefault.value.rule_refine ||
-    promptForm.value.bonus_judgment !== promptFormDefault.value.bonus_judgment ||
-    promptForm.value.deduction_judgment !== promptFormDefault.value.deduction_judgment
+  return promptForm.value.speaker_detection?.system !== promptFormDefault.value.speaker_detection?.system ||
+    promptForm.value.speaker_detection?.user !== promptFormDefault.value.speaker_detection?.user ||
+    promptForm.value.rule_refine?.system !== promptFormDefault.value.rule_refine?.system ||
+    promptForm.value.rule_refine?.user !== promptFormDefault.value.rule_refine?.user ||
+    promptForm.value.bonus_judgment?.system !== promptFormDefault.value.bonus_judgment?.system ||
+    promptForm.value.bonus_judgment?.user !== promptFormDefault.value.bonus_judgment?.user ||
+    promptForm.value.deduction_judgment?.system !== promptFormDefault.value.deduction_judgment?.system ||
+    promptForm.value.deduction_judgment?.user !== promptFormDefault.value.deduction_judgment?.user
 })
 
 const canSaveLlm = computed(() => {
@@ -511,6 +572,7 @@ async function loadConfig() {
       temperature: configData.llm.temperature || 0.1,
       max_tokens: configData.llm.max_tokens || 2000,
       json_retry_count: configData.llm.json_retry_count || 3,
+      enable_thinking: configData.llm.enable_thinking || false,
     }
 
     asrForm.value = {
@@ -519,12 +581,24 @@ async function loadConfig() {
     }
 
     promptForm.value = {
-      speaker_detection: promptsData.speaker_detection || DEFAULT_PROMPTS.speaker_detection,
-      rule_refine: promptsData.rule_refine || DEFAULT_PROMPTS.rule_refine,
-      bonus_judgment: promptsData.bonus_judgment || DEFAULT_PROMPTS.bonus_judgment,
-      deduction_judgment: promptsData.deduction_judgment || DEFAULT_PROMPTS.deduction_judgment,
+      speaker_detection: {
+        system: promptsData.speaker_detection?.system || DEFAULT_PROMPTS.speaker_detection.system,
+        user: promptsData.speaker_detection?.user || DEFAULT_PROMPTS.speaker_detection.user,
+      },
+      rule_refine: {
+        system: promptsData.rule_refine?.system || DEFAULT_PROMPTS.rule_refine.system,
+        user: promptsData.rule_refine?.user || DEFAULT_PROMPTS.rule_refine.user,
+      },
+      bonus_judgment: {
+        system: promptsData.bonus_judgment?.system || DEFAULT_PROMPTS.bonus_judgment.system,
+        user: promptsData.bonus_judgment?.user || DEFAULT_PROMPTS.bonus_judgment.user,
+      },
+      deduction_judgment: {
+        system: promptsData.deduction_judgment?.system || DEFAULT_PROMPTS.deduction_judgment.system,
+        user: promptsData.deduction_judgment?.user || DEFAULT_PROMPTS.deduction_judgment.user,
+      },
     }
-    promptFormDefault.value = { ...promptForm.value }
+    promptFormDefault.value = JSON.parse(JSON.stringify(promptForm.value))
 
     currentLlmConfig.value = { ...llmData }
     currentAsrConfig.value = { ...configData.asr }
@@ -601,6 +675,7 @@ async function handleSaveLlm() {
       temperature: llmForm.value.temperature,
       max_tokens: llmForm.value.max_tokens,
       json_retry_count: llmForm.value.json_retry_count,
+      enable_thinking: llmForm.value.enable_thinking,
     })
     ElMessage.success('LLM配置保存成功')
     await loadConfig()
@@ -638,6 +713,7 @@ async function handleSavePrompts() {
       bonus_judgment: promptForm.value.bonus_judgment,
       deduction_judgment: promptForm.value.deduction_judgment,
     })
+    promptFormDefault.value = JSON.parse(JSON.stringify(promptForm.value))
     ElMessage.success('Prompt配置保存成功')
     await loadConfig()
   } catch (e) {
@@ -740,6 +816,17 @@ onMounted(() => {
 .prompt-form :deep(.el-textarea) {
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   font-size: 13px;
+}
+
+.prompt-section {
+  width: 100%;
+}
+
+.prompt-label {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 4px;
+  font-weight: 500;
 }
 
 .card-footer {
