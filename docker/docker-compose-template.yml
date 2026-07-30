@@ -2,7 +2,6 @@ services:
   # MySQL数据库
   mysql:
     image: mysql:8.0
-    container_name: voxaudit_mysql
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-voxaudit_root_2024}
       MYSQL_USER: ${DB_USER:-voxaudit_admin}
@@ -26,7 +25,6 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.backend
-    container_name: voxaudit_backend
     env_file:
       - .env
     working_dir: /workspace
@@ -46,7 +44,6 @@ services:
   # MinIO对象存储
   minio:
     image: minio/minio:latest
-    container_name: voxaudit_minio
     volumes:
       - minio_data:/data
     ports:
@@ -66,7 +63,6 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.frontend
-    container_name: voxaudit_frontend
     ports:
       - "${FRONTEND_EXTERNAL_PORT:-8888}:80"
     networks:
