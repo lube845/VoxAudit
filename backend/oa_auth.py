@@ -125,8 +125,8 @@ def oa_login_with_password(loginid: str, password: str) -> Tuple[bool, Optional[
     try:
         login_url = f"{base_url}/api/hrm/login/checkLogin"
         payload = {
-            "loginid": encrypted_loginid,
-            "userpassword": encrypted_password,
+            "loginid": loginid,
+            "userpassword": password,
             "logintype": "1",
             "islangueid": "7",
             "isRememberPassword": "false",
