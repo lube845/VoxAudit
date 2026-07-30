@@ -81,15 +81,24 @@
 ### 部署
 
 ```bash
-# 1. 复制环境配置
+# 1. 复制编排模板和示例配置
+cp docker/docker-compose-template.yml docker/docker-compose.yml
 cp docker/.env.example docker/.env
-# 编辑 docker/.env 填入实际配置
 
-# 2. 启动服务 (首次构建较慢)
+# 2. 编辑 docker/.env 填入实际配置
+# 特别注意以下敏感信息不要提交到代码仓库：
+#   - DB_PASSWORD（数据库密码）
+#   - ADMIN_PASSWORD（管理后台密码）
+#   - OSS_SECRET_KEY（对象存储密钥）
+#   - OA_SECRET_KEY（OA认证密钥）
+#   - DB_SECRET_KEY（加密密钥，用于解密 DB_PASSWORD）
+# 生产环境建议通过环境变量注入而非写在 .env 文件中
+
+# 3. 启动服务 (首次构建较慢)
 cd docker
 docker-compose up -d --build
 
-# 3. 访问系统
+# 4. 访问系统
 # 前端: http://localhost:8888
 # 后端API: http://localhost:8000
 # API文档: http://localhost:8000/docs
@@ -129,10 +138,12 @@ VoxAudit/
 │   │   └── router/          # 路由配置
 │   └── package.json
 ├── docker/                  # Docker 配置
-│   ├── docker-compose.yml   # 编排配置
+│   ├── docker-compose-template.yml  # 编排模板（需复制为 docker-compose.yml）
+│   ├── docker-compose.yml   # 编排配置（由模板复制）
 │   ├── Dockerfile.backend   # 后端镜像
 │   ├── Dockerfile.frontend  # 前端镜像 (Nginx)
-│   └── nginx.conf           # Nginx 配置
+│   ├── nginx.conf           # Nginx 配置
+│   └── .env.example         # 环境变量示例
 └── docs/                    # 设计文档
 ```
 

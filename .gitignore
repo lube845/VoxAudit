@@ -152,3 +152,4 @@ Jenkinsfile
 Thumbs.db
 
 backend.zip
+/docker/docker-compose.yml
