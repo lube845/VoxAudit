@@ -294,7 +294,10 @@ class ASRService:
                     return None
 
         try:
-            role_result = await self._call_llm(prompt, system_message=system_message)
+            role_result = await llm_service.call(
+                prompt=prompt, 
+                system_message=system_message
+            )
             role_info = _try_parse_json(role_result)
             if role_info is None:
                 raise Exception("JSON解析失败")
@@ -360,31 +363,6 @@ class ASRService:
                     seg["speaker"] = "customer_" + str(customer_num)
                     seg["speaker_name"] = "客户" + str(customer_num)
             return segments
-
-    def _extract_json(self, text: str) -> str:
-        """从LLM返回内容中提取JSON字符串"""
-        # 移除思考标签
-        text = re.sub(r'<think>.*?\n\n', '', text, flags=re.DOTALL).strip()
-
-        # 尝试从markdown代码块中提取
-        json_match = re.search(r'```(?:json)?\s*([\s\S]*?)```', text)
-        if json_match:
-            return json_match.group(1).strip()
-
-        # 尝试找到最后一个 {及其后的内容
-        json_start = text.rfind("{")
-        if json_start >= 0:
-            return text[json_start:]
-
-        return text
-
-    async def _call_llm(self, prompt, system_message: str = None):
-        """调用LLM API"""
-        content = await llm_service.call(
-            prompt=prompt,
-            system_message=system_message,
-        )
-        return self._extract_json(content)
 
     def _parse_transcript_result(self, result: Dict) -> Dict:
         """解析ASR返回的Markdown结果"""

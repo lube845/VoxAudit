@@ -355,7 +355,7 @@ const DEFAULT_PROMPTS = {
 {
   "speaker_roles": {
     "speaker_0": "agent" 或 "customer" 或 "unknown",
-    ...
+    "speaker_1": "agent" 或 "customer" 或 "unknown"
   },
   "confidence": "high" 或 "medium" 或 "low",
   "reasoning": "简要说明判断依据，30-50字以内，若有特殊情况（转接/代接/信息不足）请注明"
