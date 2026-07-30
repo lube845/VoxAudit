@@ -1,4 +1,4 @@
-# VoxAudit 智能语音质检系统
+# VoxAudit 智能语音管理系统
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/docker-ready-2496ed.svg)](https://www.docker.com/)
@@ -16,6 +16,20 @@
 - 📄 **报告导出**：一键生成 Word 格式评分报告
 - ☁️ **对象存储**：MinIO / 腾讯云 COS 录音文件管理
 - ⚙️ **系统设置**：支持在界面配置 ASR、LLM、OSS 等全部参数，无需手动修改配置文件
+
+## 界面预览
+
+### 主页与统计
+![主页](docs/images/home.png)
+
+### 规则管理
+![规则管理](docs/images/rules.png)
+
+### 录音管理
+![录音管理](docs/images/recording_list.png)
+
+### 录音详情
+![录音详情](docs/images/recording_details.png)
 
 ## 技术栈
 
