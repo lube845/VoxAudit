@@ -28,6 +28,10 @@ class LLMService:
         if self._config is None:
             self._config = await config_service.get_llm_config()
 
+    async def refresh_config(self):
+        """强制刷新配置（用于配置更新后立即生效）"""
+        self._config = await config_service.get_llm_config()
+
     async def call(
         self,
         prompt: str,

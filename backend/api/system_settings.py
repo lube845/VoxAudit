@@ -11,6 +11,7 @@ from backend.core.config import settings
 from backend.models.system_settings import SystemSettings
 from backend.api.auth import get_current_user_required
 from backend.services.config_service import DEFAULT_PROMPTS
+from backend.services.llm_service import llm_service
 
 router = APIRouter(prefix="/system-settings", tags=["系统设置"])
 
@@ -151,6 +152,8 @@ async def update_llm_config(
             await set_setting(session, "LLM_ENABLE_THINKING", str(config.enable_thinking).lower(), "大模型深度思考开关")
 
         await session.commit()
+        # 刷新LLM服务缓存，使新配置立即生效
+        await llm_service.refresh_config()
         return {"message": "LLM配置更新成功"}
 
 
