@@ -86,21 +86,27 @@ export default {
       if (filtered.is_rejected === '' || filtered.is_rejected === null) {
         delete filtered.is_rejected
       }
-      return request.get('/recordings', { params: filtered })
+      return request.get('/recordings', { params: filtered }).then(res => {
+        // 确保列表中的 id 为整数类型，避免因 JSON 解析导致 id 变成字符串
+        if (res.items) {
+          res.items = res.items.map(item => ({ ...item, id: Number(item.id) }))
+        }
+        return res
+      })
     },
-    get: (id) => request.get(`/recordings/${id}`),
+    get: (id) => request.get(`/recordings/${Number(id)}`),
     initUpload: (data) => request.post('/recordings/init-upload', data),
-    upload: (id, formData) => request.post(`/recordings/${id}/upload`, formData, {
+    upload: (id, formData) => request.post(`/recordings/${Number(id)}/upload`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     }),
-    delete: (id) => request.delete(`/recordings/${id}`),
-    getScore: (id) => request.get(`/recordings/${id}/score`),
-    triggerTranscribe: (id) => request.post(`/recordings/${id}/transcribe`),
-    triggerScore: (id) => request.post(`/recordings/${id}/score`),
-    getPlayUrl: (id) => request.get(`/recordings/${id}/play`),
-    retryTranscribe: (id) => request.post(`/recordings/${id}/transcribe`),
-    retryScore: (id) => request.post(`/recordings/${id}/score`),
-    batchRetry: (ids) => request.post('/recordings/batch-retry', ids),
+    delete: (id) => request.delete(`/recordings/${Number(id)}`),
+    getScore: (id) => request.get(`/recordings/${Number(id)}/score`),
+    triggerTranscribe: (id) => request.post(`/recordings/${Number(id)}/transcribe`),
+    triggerScore: (id) => request.post(`/recordings/${Number(id)}/score`),
+    getPlayUrl: (id) => request.get(`/recordings/${Number(id)}/play`),
+    retryTranscribe: (id) => request.post(`/recordings/${Number(id)}/transcribe`),
+    retryScore: (id) => request.post(`/recordings/${Number(id)}/score`),
+    batchRetry: (ids) => request.post('/recordings/batch-retry', ids.map(id => Number(id))),
   },
 
   statistics: {
@@ -114,7 +120,7 @@ export default {
   export: {
     agents: () => request.get('/export/agents'),
     getReport: (params) => request.get('/export/report', { params, responseType: 'blob' }),
-    exportSingleRecording: (recordingId) => request.get(`/export/recording/${recordingId}`, { responseType: 'blob' }),
+    exportSingleRecording: (recordingId) => request.get(`/export/recording/${Number(recordingId)}`, { responseType: 'blob' }),
   },
 
   agent: {

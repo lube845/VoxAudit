@@ -144,7 +144,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
@@ -288,8 +288,12 @@ async function exportReport() {
 }
 
 async function loadData() {
+  const id = route.params.id
+  if (!id) {
+    console.warn('录音ID不存在，等待路由参数准备好')
+    return
+  }
   try {
-    const id = route.params.id
     const recData = await api.recording.get(id)
     recording.value = recData
     // 从 scoring_results 中获取评分结果
@@ -305,12 +309,16 @@ async function loadData() {
   }
    // 兼容单独调用 score 接口的方式（如果 scoring_results 为空）
   if (!scoringResult.value) {
-    try {
-      const id = route.params.id
-      const scoreData = await api.recording.getScore(id)
-      scoringResult.value = scoreData
-    } catch (e) {
-      console.error(e)
+    const scoreId = route.params.id
+    if (!scoreId) {
+      console.warn('录音ID不存在，跳过score查询')
+    } else {
+      try {
+        const scoreData = await api.recording.getScore(scoreId)
+        scoringResult.value = scoreData
+      } catch (e) {
+        console.error(e)
+      }
     }
   }
 }
@@ -319,10 +327,15 @@ async function pollTranscriptionResult() {
   const maxAttempts = 60
   const interval = 3000
   for (let i = 0; i < maxAttempts; i++) {
+    const pollId = route.params.id
+    if (!pollId) {
+      // ID 还没准备好，短暂等待后重试
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      continue
+    }
     await new Promise(resolve => setTimeout(resolve, interval))
     try {
-      const id = route.params.id
-      const recData = await api.recording.get(id)
+      const recData = await api.recording.get(pollId)
       recording.value = recData
       // 转写完成或失败，停止轮询
       if (recData.status === 'transcribed' || recData.status === 'scoring' || recData.status === 'scored') {
@@ -340,6 +353,13 @@ async function pollTranscriptionResult() {
 onMounted(() => {
   loadData()
 })
+
+// 监听路由变化，防止 ID 未准备好就调用 API
+watch(() => route.params.id, (newId) => {
+  if (newId) {
+    loadData()
+  }
+}, { immediate: false })
 </script>
 
 <style scoped>

@@ -85,7 +85,7 @@ async def validation_exception_handler(request, exc):
         if loc and len(loc) > 1:
             field_key = str(loc[1])
             field_label = field_names.get(field_key, field_key)
-            errors.append(f"{field_label}的prompt过短（最少10个字）")
+            errors.append(f"{field_label}：{err.get('msg', '验证失败')}")
         else:
             errors.append(err.get("msg", "验证失败"))
 
