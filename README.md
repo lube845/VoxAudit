@@ -152,20 +152,6 @@ uploading       uploaded      transcribing       scoring          scored
                                transcribed
 ```
 
-### 评分规则版本管理
-
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────────────────────┐
-│  创建规则v1  │───▶│ 创建规则v2   │───▶│ 旧录音自动用v1，新录音用v2    │
-└─────────────┘    └─────────────┘    └─────────────────────────────┘
-       │                  │
-       ▼                  ▼
- is_latest=false    is_latest=true
-```
-
-## API 文档
-
-启动服务后访问: `http://localhost:8000/docs` (Swagger UI)
 
 ## 配置说明
 
@@ -175,8 +161,6 @@ uploading       uploaded      transcribing       scoring          scored
 |------|------|
 | `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD` | 数据库连接 |
 | `OSS_ENDPOINT/OSS_ACCESS_KEY/OSS_SECRET_KEY` | 对象存储 |
-| `LLM_API_ENDPOINT/LLM_API_KEY/LLM_MODEL` | 大模型 API |
-| `ASR_API_URL` | 语音转写服务地址 |
 | `OA_BASE_URL/OA_SECRET_KEY` | OA 认证配置 |
 
 ## 常见问题
