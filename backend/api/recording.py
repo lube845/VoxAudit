@@ -215,6 +215,7 @@ async def _transcribe_impl(
         await db.commit()
         transcript_result = await asr_service.transcribe_with_role(
             file_content, recording.file_name,
+            force_method=recording.speaker_detection_method,
             left_channel_role=recording.left_channel_role,
             right_channel_role=recording.right_channel_role,
         )
