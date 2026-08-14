@@ -1,9 +1,24 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
+const SESSION_EXPIRE_HOURS = 8
+
 const getUserInfo = () => {
   const info = localStorage.getItem('user_info')
-  return info ? JSON.parse(info) : null
+  if (!info) return null
+  const userInfo = JSON.parse(info)
+
+  // 检查会话是否过期
+  if (userInfo.login_time) {
+    const expireMs = SESSION_EXPIRE_HOURS * 60 * 60 * 1000
+    if (Date.now() - userInfo.login_time > expireMs) {
+      localStorage.removeItem('user_info')
+      ElMessage.warning('登录已过期，请重新登录')
+      window.location.href = '/login'
+      return null
+    }
+  }
+  return userInfo
 }
 
 const getEncodedUserInfo = () => {

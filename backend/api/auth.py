@@ -1,6 +1,7 @@
 """
 登录认证API
 """
+import time
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from typing import Optional
@@ -36,6 +37,14 @@ async def get_current_user(x_user_info: Optional[str] = Header(None, alias="X-Us
         user_info = json.loads(decoded)
         if not user_info.get("loginid"):
             raise HTTPException(status_code=401, detail="无效的用户信息")
+
+        # 检查会话是否过期
+        login_time = user_info.get("login_time")
+        if login_time:
+            expire_seconds = settings.SESSION_EXPIRE_HOURS * 3600
+            if time.time() - login_time > expire_seconds:
+                raise HTTPException(status_code=401, detail="登录已过期，请重新登录")
+
         return user_info
     except HTTPException:
         raise
@@ -57,6 +66,14 @@ async def get_current_user_required(x_user_info: Optional[str] = Header(None, al
         user_info = json.loads(decoded)
         if not user_info.get("loginid"):
             raise HTTPException(status_code=401, detail="无效的用户信息")
+
+        # 检查会话是否过期
+        login_time = user_info.get("login_time")
+        if login_time:
+            expire_seconds = settings.SESSION_EXPIRE_HOURS * 3600
+            if time.time() - login_time > expire_seconds:
+                raise HTTPException(status_code=401, detail="登录已过期，请重新登录")
+
         return user_info
     except HTTPException:
         raise
@@ -86,7 +103,8 @@ async def login(request: LoginRequest):
                 "姓名": "超级管理员",
                 "部门": "系统管理",
                 "岗位": "管理员",
-                "loginid": "admin"
+                "loginid": "admin",
+                "login_time": time.time()
             }
         )
 
@@ -98,6 +116,9 @@ async def login(request: LoginRequest):
             success=False,
             message=message
         )
+
+    # 添加登录时间戳
+    user_info["login_time"] = time.time()
 
     return LoginResponse(
         success=True,

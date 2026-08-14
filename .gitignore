@@ -32,6 +32,7 @@ build/
 
 # Virtual environments
 .venv/
+.venv*/
 venv/
 ENV/
 env/

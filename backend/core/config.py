@@ -58,6 +58,9 @@ class Settings(BaseSettings):
     OA_TOKEN_EXPIRE_MINUTES: int = 5
     OA_TIME_OFFSET_SECONDS: int = 0
 
+    # 会话配置
+    SESSION_EXPIRE_HOURS: int = 8  # 登录后8小时要求重新登录
+
     # ASR配置
     ASR_API_URL: str = ""
     ASR_API_KEY: str = ""
