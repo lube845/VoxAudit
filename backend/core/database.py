@@ -67,23 +67,17 @@ async def ensure_database_exists():
 
 
 async def init_db():
-    """初始化数据库结构"""
+    """初始化数据库结构 + 自动迁移。
+
+    新建项目：create_all 建表，迁移全部 no-op。
+    升级项目：表已存在，迁移按 SHOW COLUMNS / 旧列存在性检查后增量 ALTER，已存数据不动。
+    """
     await ensure_database_exists()
 
     async with engine.begin() as conn:
-        # 先创建表结构
         await conn.run_sync(Base.metadata.create_all)
 
-        # 检查并添加 is_veto 列（如果不存在）
-        result = await conn.execute(text("SHOW COLUMNS FROM scoring_rules LIKE 'is_veto'"))
-        if not result.fetchone():
-            await conn.execute(text(
-                "ALTER TABLE scoring_rules ADD COLUMN is_veto BOOLEAN DEFAULT FALSE COMMENT '是否否决项'"
-            ))
-
-        # 检查并添加 is_enabled 列（如果不存在）
-        result = await conn.execute(text("SHOW COLUMNS FROM scoring_rules LIKE 'is_enabled'"))
-        if not result.fetchone():
-            await conn.execute(text(
-                "ALTER TABLE scoring_rules ADD COLUMN is_enabled BOOLEAN DEFAULT TRUE COMMENT '是否启用（启用且最新才参与评分）'"
-            ))
+    # 全部幂等；数据迁移放最后
+    from backend.migrations import ALL_MIGRATIONS
+    for mod in ALL_MIGRATIONS:
+        await mod.migrate()
