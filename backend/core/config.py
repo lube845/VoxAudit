@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     ADMIN_USER: str = ""
     ADMIN_PASSWORD: str = ""
 
+    # k 前缀本地账号的默认密码（首次登录后强制改密）
+    K_USER_DEFAULT_PASSWORD: str = "kefu123456"
+    # k 账号改密后多少天再次强制改密
+    K_USER_PASSWORD_EXPIRE_DAYS: int = 90
+
     # OA配置
     OA_BASE_URL: str = ""
     OA_SECRET_KEY: str = ""

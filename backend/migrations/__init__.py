@@ -9,6 +9,7 @@ from . import (
     migrate_add_user_id,
     migrate_add_veto,
     migrate_drop_compatibility_mode,
+    migrate_add_password_changed_at,
     migrate_rule_ids_to_json,
 )
 
@@ -21,5 +22,6 @@ ALL_MIGRATIONS = (
     migrate_add_user_id,
     migrate_add_veto,
     migrate_drop_compatibility_mode,
+    migrate_add_password_changed_at,
     migrate_rule_ids_to_json,
 )
