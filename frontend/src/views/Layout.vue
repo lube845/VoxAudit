@@ -13,9 +13,9 @@
         :default-active="activeMenu"
         router
         class="sidebar-menu"
-        background-color="#1a1a2e"
-        text-color="#a0a0a0"
-        active-text-color="#ffffff"
+        background-color="transparent"
+        text-color="#9c948a"
+        active-text-color="#faf8f4"
         :unique-opened="true"
       >
         <el-menu-item index="/home">
@@ -53,11 +53,14 @@
     <el-container class="main-container">
       <el-header class="header">
         <div class="header-left">
-          <h3>评分规则管理</h3>
+          <h3 class="page-title">{{ pageTitle }}</h3>
         </div>
         <div class="header-right">
           <span class="user-info">{{ userInfo?.姓名 }} ({{ userInfo?.工号 }})</span>
-          <el-button type="danger" size="small" @click="handleLogout">退出</el-button>
+          <el-button size="small" plain @click="handleLogout">
+            <el-icon><LogOut /></el-icon>
+            退出
+          </el-button>
         </div>
       </el-header>
 
@@ -71,7 +74,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { AudioLines, LayoutDashboard, ListChecks, Mic, FileDown, Trash2, Users, Settings } from 'lucide-vue-next'
+import { AudioLines, LayoutDashboard, ListChecks, Mic, FileDown, Trash2, Users, Settings, LogOut } from 'lucide-vue-next'
 import { now, formatDate } from '@/utils/timezone'
 import api from '@/api'
 
@@ -84,6 +87,21 @@ const activeMenu = computed(() => route.path)
 const userInfo = computed(() => api.auth.getUserInfo())
 
 const isAdmin = computed(() => userInfo.value?.loginid === 'admin')
+
+const pageTitles = {
+  '/home': '数据概览',
+  '/rules': '规则管理',
+  '/recordings': '录音管理',
+  '/export': '导出报告',
+  '/storage': '存储清理',
+  '/user-stats': '用户统计',
+  '/system-settings': '系统设置'
+}
+
+const pageTitle = computed(() => {
+  if (route.path.startsWith('/recordings/')) return '录音详情'
+  return pageTitles[route.path] || '语音质检助手'
+})
 
 function handleLogout() {
   api.auth.logout()
@@ -111,59 +129,68 @@ onUnmounted(() => {
 <style scoped>
 .layout-container {
   height: 100vh;
-  background: #f5f7fa;
+  background: var(--va-paper);
 }
 
-/* 侧边栏 */
+/* 侧边栏：墨色 */
 .sidebar {
-  background: #1a1a2e;
+  background: var(--va-ink);
   display: flex;
   flex-direction: column;
-  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
 }
 
 .sidebar-header {
-  padding: 20px;
-  border-bottom: 1px solid #2a2a4e;
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid rgba(250, 248, 244, 0.08);
 }
 
 .logo {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .logo-icon {
-  color: #a78bfa;
+  color: var(--va-accent);
   flex-shrink: 0;
 }
 
 .logo-text {
-  font-size: 20px;
+  font-family: var(--va-font-display);
+  font-size: 19px;
   font-weight: 700;
-  color: #ffffff;
+  color: #faf8f4;
+  letter-spacing: 0.04em;
 }
 
 .sidebar-menu {
   flex: 1;
   border-right: none;
   background: transparent;
+  padding: 12px 0;
 }
 
 :deep(.el-menu-item) {
-  height: 50px;
-  line-height: 50px;
-  margin: 4px 12px;
-  border-radius: 8px;
+  height: 44px;
+  line-height: 44px;
+  margin: 2px 12px;
+  border-radius: var(--va-radius-sm);
+  font-size: 13.5px;
+  transition: background var(--va-duration) var(--va-ease), color var(--va-duration) var(--va-ease);
 }
 
 :deep(.el-menu-item:hover) {
-  background: #2a2a4e !important;
+  background: rgba(250, 248, 244, 0.06) !important;
+  color: #faf8f4 !important;
 }
 
 :deep(.el-menu-item.is-active) {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  color: #ffffff !important;
+  background: rgba(176, 68, 44, 0.16) !important;
+  color: #faf8f4 !important;
+}
+
+:deep(.el-menu-item.is-active .el-icon) {
+  color: var(--va-accent);
 }
 
 :deep(.el-menu-item.is-active::before) {
@@ -172,10 +199,10 @@ onUnmounted(() => {
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  width: 4px;
-  height: 24px;
-  background: #ffffff;
-  border-radius: 0 4px 4px 0;
+  width: 3px;
+  height: 20px;
+  background: var(--va-accent);
+  border-radius: 0 2px 2px 0;
 }
 
 /* 主内容区 */
@@ -185,36 +212,39 @@ onUnmounted(() => {
 }
 
 .header {
-  background: #ffffff;
+  background: var(--va-paper);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  padding: 0 28px;
+  border-bottom: 1px solid var(--va-hairline);
   z-index: 100;
 }
 
-.header h3 {
+.page-title {
   margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #303133;
+  font-family: var(--va-font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--va-ink);
+  letter-spacing: 0.02em;
 }
 
-.time {
-  font-size: 13px;
-  color: #909399;
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .user-info {
-  margin-right: 16px;
   font-size: 13px;
-  color: #606266;
+  color: var(--va-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .main-content {
-  padding: 24px;
+  padding: 28px;
   overflow-y: auto;
-  background: #f5f7fa;
+  background: var(--va-paper);
 }
 </style>

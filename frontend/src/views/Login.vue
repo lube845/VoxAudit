@@ -1,7 +1,11 @@
 <template>
   <div class="login-container">
     <div class="login-box">
-      <h1 class="title">智能语音质检系统</h1>
+      <div class="brand">
+        <AudioLines :size="26" class="brand-icon" />
+        <h1 class="title">智能语音质检系统</h1>
+        <p class="subtitle">ASR 转写 · AI 评分 · 催收通话质检平台</p>
+      </div>
       <el-form ref="formRef" :model="form" :rules="rules" class="login-form">
         <el-form-item prop="loginid">
           <el-input
@@ -40,6 +44,7 @@
         </el-form-item>
       </el-form>
     </div>
+    <div class="footer-note">VoxAudit · 自动化通话质检</div>
   </div>
 </template>
 
@@ -47,7 +52,7 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { User, Lock, Eye, EyeOff } from 'lucide-vue-next'
+import { User, Lock, Eye, EyeOff, AudioLines } from 'lucide-vue-next'
 import api from '@/api'
 
 const router = useRouter()
@@ -90,41 +95,98 @@ const handleLogin = async () => {
 <style scoped>
 .login-container {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--va-paper);
+  /* 编辑风发丝网格 */
+  background-image:
+    linear-gradient(var(--va-hairline) 1px, transparent 1px),
+    linear-gradient(90deg, var(--va-hairline) 1px, transparent 1px);
+  background-size: 56px 56px;
+  background-position: center;
+  position: relative;
+}
+
+.login-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 70% 60% at 50% 45%, var(--va-paper) 30%, transparent 75%);
+  pointer-events: none;
 }
 
 .login-box {
+  position: relative;
   width: 400px;
-  padding: 40px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  padding: 48px 44px 40px;
+  background: #fff;
+  border: 1px solid var(--va-hairline);
+  border-radius: var(--va-radius-md);
+  box-shadow: 0 2px 6px rgba(33, 29, 24, 0.05), 0 16px 48px rgba(33, 29, 24, 0.07);
+}
+
+.login-box::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: 32px;
+  right: 32px;
+  height: 2px;
+  background: var(--va-accent);
+}
+
+.brand {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.brand-icon {
+  color: var(--va-accent);
 }
 
 .title {
-  text-align: center;
-  margin-bottom: 30px;
-  color: #333;
-  font-size: 24px;
+  margin: 14px 0 8px;
+  font-family: var(--va-font-display);
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--va-ink);
+  letter-spacing: 0.05em;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--va-muted);
+  letter-spacing: 0.12em;
 }
 
 .login-form {
-  margin-top: 20px;
+  margin-top: 8px;
 }
 
 .login-button {
   width: 100%;
+  letter-spacing: 0.3em;
+  text-indent: 0.3em;
+  font-weight: 600;
+}
+
+.footer-note {
+  position: relative;
+  margin-top: 28px;
+  font-size: 12px;
+  color: var(--va-muted);
+  letter-spacing: 0.2em;
 }
 
 .password-toggle {
   cursor: pointer;
-  color: #909399;
+  color: var(--va-muted);
 }
 
 .password-toggle:hover {
-  color: #409eff;
+  color: var(--va-accent);
 }
 </style>

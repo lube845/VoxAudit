@@ -311,33 +311,33 @@ onMounted(() => {
 .stat-item {
   text-align: center;
   padding: 20px 10px;
-  background: #f5f7fa;
-  border-radius: 8px;
+  background: var(--va-paper-deep);
+  border-radius: var(--va-radius-md);
 }
 
 .stat-label {
   font-size: 14px;
-  color: #909399;
+  color: var(--va-muted);
   margin-bottom: 8px;
 }
 
 .stat-value {
   font-size: 24px;
   font-weight: 600;
-  color: #303133;
+  color: var(--va-ink);
 }
 
 .stat-value.highlight {
-  color: #409eff;
+  color: #b0442c;
 }
 
 .stat-value.normal {
-  color: #67c23a;
+  color: #3d7a4f;
 }
 
 .stat-desc {
   font-size: 12px;
-  color: #909399;
+  color: var(--va-muted);
   margin-top: 4px;
 }
 
@@ -355,6 +355,6 @@ onMounted(() => {
   align-items: center;
   margin-bottom: 10px;
   font-size: 14px;
-  color: #606266;
+  color: var(--va-ink-soft);
 }
 </style>

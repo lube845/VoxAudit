@@ -1,9 +1,5 @@
 <template>
   <div class="system-settings">
-    <div class="page-header">
-      <h2>系统设置</h2>
-    </div>
-
     <el-tabs v-model="activeTab" class="settings-tabs">
       <!-- LLM配置 -->
       <el-tab-pane label="大模型配置" name="llm">
@@ -757,7 +753,7 @@ onMounted(() => {
   margin: 0;
   font-size: 24px;
   font-weight: 600;
-  color: #303133;
+  color: var(--va-ink);
 }
 
 .settings-tabs {
@@ -772,8 +768,8 @@ onMounted(() => {
 
 .config-card :deep(.el-card__header) {
   padding: 16px 20px;
-  background: #f8f9fb;
-  border-bottom: 1px solid #ebeef5;
+  background: var(--va-paper-deep);
+  border-bottom: 1px solid var(--va-hairline);
 }
 
 .config-card :deep(.el-card__body) {
@@ -792,7 +788,7 @@ onMounted(() => {
   gap: 8px;
   font-weight: 600;
   font-size: 15px;
-  color: #303133;
+  color: var(--va-ink);
 }
 
 .header-actions {
@@ -802,7 +798,7 @@ onMounted(() => {
 
 .card-icon {
   font-size: 18px;
-  color: #409eff;
+  color: #b0442c;
 }
 
 .settings-form {
@@ -824,7 +820,7 @@ onMounted(() => {
 
 .prompt-label {
   font-size: 12px;
-  color: #909399;
+  color: var(--va-muted);
   margin-bottom: 4px;
   font-weight: 500;
 }
@@ -835,7 +831,7 @@ onMounted(() => {
   align-items: center;
   margin-top: 24px;
   padding-top: 16px;
-  border-top: 1px solid #ebeef5;
+  border-top: 1px solid var(--va-hairline);
   flex-wrap: wrap;
   gap: 12px;
 }
@@ -857,34 +853,34 @@ onMounted(() => {
 }
 
 .test-message.success {
-  color: #67c23a;
+  color: #3d7a4f;
 }
 
 .test-message.error {
-  color: #f56c6c;
+  color: #b03424;
 }
 
 .tip-text {
   font-size: 12px;
-  color: #909399;
+  color: var(--va-muted);
 }
 
 .form-tip {
   font-size: 12px;
-  color: #909399;
+  color: var(--va-muted);
   margin-top: 4px;
   line-height: 1.4;
 }
 
 .preview-card {
-  background: #fafafa;
-  border: 1px dashed #dcdfe6;
+  background: var(--va-paper-deep);
+  border: 1px dashed var(--va-hairline-dark);
 }
 
 .preview-card :deep(.el-card__header) {
   padding: 12px 20px;
   background: transparent;
-  border-bottom: 1px dashed #dcdfe6;
+  border-bottom: 1px dashed var(--va-hairline-dark);
 }
 
 .preview-card :deep(.el-card__body) {
@@ -905,12 +901,12 @@ onMounted(() => {
 
 .preview-label {
   font-size: 12px;
-  color: #909399;
+  color: var(--va-muted);
 }
 
 .preview-value {
   font-size: 14px;
-  color: #303133;
+  color: var(--va-ink);
   font-weight: 500;
   word-break: break-all;
 }

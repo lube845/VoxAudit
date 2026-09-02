@@ -1,9 +1,5 @@
 <template>
   <div class="export-page">
-    <div class="page-header">
-      <h2>导出报告</h2>
-    </div>
-
     <el-card class="export-card">
       <div class="export-form">
         <!-- 导出类型 -->
@@ -232,20 +228,8 @@ onMounted(() => {
   padding: 0;
 }
 
-.page-header {
-  margin-bottom: 20px;
-}
-
-.page-header h2 {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-}
-
 .export-card {
-  background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 100%);
-  border: none;
+  background: #fff;
 }
 
 .export-form {
@@ -261,9 +245,10 @@ onMounted(() => {
 }
 
 .section-label {
-  font-size: 14px;
+  font-size: 12.5px;
   font-weight: 600;
-  color: #606266;
+  color: var(--va-muted);
+  letter-spacing: 0.08em;
 }
 
 .export-type-group {
@@ -278,37 +263,38 @@ onMounted(() => {
   gap: 16px;
   padding: 20px 24px;
   background: #fff;
-  border: 2px solid #e4e7ed;
-  border-radius: 12px;
+  border: 1px solid var(--va-hairline-dark);
+  border-radius: var(--va-radius-md);
   cursor: pointer;
-  transition: all 0.3s;
+  transition: border-color var(--va-duration) var(--va-ease), background var(--va-duration) var(--va-ease);
   position: relative;
 }
 
 .type-card:hover {
-  border-color: #409eff;
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.1);
+  border-color: var(--va-accent);
 }
 
 .type-card.active {
-  border-color: #409eff;
-  background: linear-gradient(135deg, #f0f7ff 0%, #e8f4ff 100%);
+  border-color: var(--va-accent);
+  border-width: 1px;
+  box-shadow: inset 0 0 0 1px var(--va-accent);
+  background: var(--va-accent-soft);
 }
 
 .type-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 10px;
-  background: #f0f2ff;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--va-radius-sm);
+  background: var(--va-paper-deep);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
-  color: #409eff;
+  color: var(--va-ink-soft);
+  transition: all var(--va-duration) var(--va-ease);
 }
 
 .type-card.active .type-icon {
-  background: #409eff;
+  background: var(--va-accent);
   color: #fff;
 }
 
@@ -317,15 +303,15 @@ onMounted(() => {
 }
 
 .type-name {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  color: #303133;
+  color: var(--va-ink);
   margin-bottom: 4px;
 }
 
 .type-desc {
-  font-size: 13px;
-  color: #909399;
+  font-size: 12.5px;
+  color: var(--va-muted);
 }
 
 .type-check {
@@ -335,7 +321,7 @@ onMounted(() => {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #409eff;
+  background: var(--va-accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -357,15 +343,17 @@ onMounted(() => {
 }
 
 .card-title {
-  font-weight: bold;
-  font-size: 15px;
-  color: #303133;
+  font-family: var(--va-font-display);
+  font-weight: 700;
+  font-size: 15.5px;
+  color: var(--va-ink);
+  letter-spacing: 0.02em;
 }
 
 .export-info ul {
   margin: 0;
   padding-left: 20px;
-  color: #606266;
+  color: var(--va-ink-soft);
   line-height: 2;
 }
 

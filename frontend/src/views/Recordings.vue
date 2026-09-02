@@ -152,7 +152,7 @@
         </el-table-column>
         <el-table-column prop="total_score" label="总分" width="80" align="center">
           <template #default="{ row }">
-            <span v-if="row.total_score !== null" :style="{ color: row.total_score >= 60 ? '#67c23a' : '#f56c6c' }">
+            <span v-if="row.total_score !== null" :style="{ color: row.total_score >= 60 ? '#3d7a4f' : '#b03424' }">
               {{ row.total_score >= 0 ? '+' : '' }}{{ row.total_score }}
             </span>
             <span v-else>-</span>
@@ -160,13 +160,13 @@
         </el-table-column>
         <el-table-column prop="bonus_score" label="加分" width="80">
           <template #default="{ row }">
-            <span v-if="row.bonus_score != null" style="color: #67c23a">{{ row.bonus_score.toFixed(1) }}</span>
+            <span v-if="row.bonus_score != null" style="color: #3d7a4f">{{ row.bonus_score.toFixed(1) }}</span>
             <span v-else>-</span>
           </template>
         </el-table-column>
         <el-table-column prop="deduction_score" label="扣分" width="80">
           <template #default="{ row }">
-            <span v-if="row.deduction_score != null" style="color: #f56c6c">{{ row.deduction_score.toFixed(1) }}</span>
+            <span v-if="row.deduction_score != null" style="color: #b03424">{{ row.deduction_score.toFixed(1) }}</span>
             <span v-else>-</span>
           </template>
         </el-table-column>
@@ -722,19 +722,19 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 0;
-  border: 1px solid #dcdfe6;
+  border: 1px solid var(--va-hairline-dark);
   border-radius: 4px;
   padding: 0 8px;
-  background: #fafafa;
+  background: var(--va-paper-deep);
 }
 
 .score-filter.active {
-  border-color: #409eff;
+  border-color: #b0442c;
   background: #fff;
 }
 
 .score-filter-label {
-  color: #909399;
+  color: var(--va-muted);
   font-size: 13px;
   margin-right: 4px;
   white-space: nowrap;
@@ -770,7 +770,7 @@ onMounted(() => {
 }
 
 .total-count {
-  color: #909399;
+  color: var(--va-muted);
   font-size: 13px;
 }
 
@@ -791,21 +791,21 @@ onMounted(() => {
 
 .upload-dragger .el-icon--upload {
   font-size: 48px;
-  color: #909399;
+  color: var(--va-muted);
   margin-bottom: 16px;
 }
 
 .upload-dragger .el-upload__text {
-  color: #606266;
+  color: var(--va-ink-soft);
 }
 
 .upload-dragger .el-upload__text em {
-  color: #409eff;
+  color: #b0442c;
   font-style: normal;
 }
 
 .form-tip {
-  color: #909399;
+  color: var(--va-muted);
   font-size: 12px;
   margin-top: 4px;
   line-height: 1.4;
@@ -814,7 +814,7 @@ onMounted(() => {
 .upload-tip {
   margin-top: 8px;
   font-size: 12px;
-  color: #909399;
+  color: var(--va-muted);
 }
 
 .upload-queue {
@@ -829,7 +829,7 @@ onMounted(() => {
 .upload-item .file-name {
   display: block;
   font-size: 13px;
-  color: #606266;
+  color: var(--va-ink-soft);
   margin-bottom: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -838,7 +838,7 @@ onMounted(() => {
 
 :deep(.el-card__header) {
   padding: 16px 20px;
-  border-bottom: 1px solid #f0f0f0;
-  background: #fafafa;
+  border-bottom: 1px solid var(--va-hairline);
+  background: var(--va-paper-deep);
 }
 </style>

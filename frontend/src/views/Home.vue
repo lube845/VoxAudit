@@ -1,7 +1,6 @@
 <template>
   <div class="home-page">
     <div class="page-header">
-      <h2>数据概览</h2>
       <div class="header-filters">
         <el-radio-group v-model="timeRange" @change="handleTimeChange">
           <el-radio-button value="7">近七天</el-radio-button>
@@ -18,52 +17,44 @@
       <el-col :span="6">
         <el-card class="stat-card">
           <div class="stat-content">
-            <div class="stat-icon" style="background: #409eff">
-              <el-icon :size="28"><Mic /></el-icon>
-            </div>
             <div class="stat-info">
-              <div class="stat-value">{{ overview.total_recordings }}</div>
               <div class="stat-label">上传录音数</div>
+              <div class="stat-value">{{ overview.total_recordings }}</div>
             </div>
+            <Mic :size="22" class="stat-icon" />
           </div>
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card class="stat-card">
           <div class="stat-content">
-            <div class="stat-icon" style="background: #67c23a">
-              <el-icon :size="28"><FileCheckCorner /></el-icon>
-            </div>
             <div class="stat-info">
-              <div class="stat-value">{{ overview.scored_count }}</div>
               <div class="stat-label">已评分录音数</div>
+              <div class="stat-value">{{ overview.scored_count }}</div>
             </div>
+            <FileCheckCorner :size="22" class="stat-icon" />
           </div>
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card class="stat-card">
           <div class="stat-content">
-            <div class="stat-icon" style="background: #e6a23c">
-              <el-icon :size="28"><Star /></el-icon>
-            </div>
             <div class="stat-info">
-              <div class="stat-value">{{ overview.avg_total_score }}分</div>
               <div class="stat-label">大盘平均分</div>
+              <div class="stat-value">{{ overview.avg_total_score }}<span class="stat-unit">分</span></div>
             </div>
+            <Star :size="22" class="stat-icon" />
           </div>
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card class="stat-card">
+        <el-card class="stat-card stat-card-accent">
           <div class="stat-content">
-            <div class="stat-icon" style="background: #f56c6c">
-              <el-icon :size="28"><TriangleAlert /></el-icon>
-            </div>
             <div class="stat-info">
-              <div class="stat-value">{{ violationRate }}%</div>
               <div class="stat-label">违规率</div>
+              <div class="stat-value accent">{{ violationRate }}<span class="stat-unit">%</span></div>
             </div>
+            <TriangleAlert :size="22" class="stat-icon accent" />
           </div>
         </el-card>
       </el-col>
@@ -346,9 +337,9 @@ function renderTrendChart() {
         type: 'line',
         data: avgScores,
         smooth: true,
-        itemStyle: { color: '#409eff' },
+        itemStyle: { color: '#b0442c' },
         lineStyle: { width: 2 },
-        areaStyle: { color: 'rgba(64, 158, 255, 0.1)' },
+        areaStyle: { color: 'rgba(176, 68, 44, 0.08)' },
         symbol: 'circle',
         symbolSize: 6,
       },
@@ -357,7 +348,7 @@ function renderTrendChart() {
         type: 'line',
         data: avgBonuses,
         smooth: true,
-        itemStyle: { color: '#67c23a' },
+        itemStyle: { color: '#3d7a4f' },
         lineStyle: { width: 2 },
         symbol: 'circle',
         symbolSize: 5,
@@ -367,7 +358,7 @@ function renderTrendChart() {
         type: 'line',
         data: avgDeductions,
         smooth: true,
-        itemStyle: { color: '#f56c6c' },
+        itemStyle: { color: '#b03424' },
         lineStyle: { width: 2 },
         symbol: 'circle',
         symbolSize: 5,
@@ -394,8 +385,8 @@ function renderViolationChart() {
         const vr = params.find(p => p.seriesName === '违规率')
         const rr = params.find(p => p.seriesName === '否决率')
         return `<strong>${date}</strong><br/>
-          <span style="color:#f56c6c">●</span> 违规率：${vr ? vr.value : 0}%<br/>
-          <span style="color:#e6a23c">●</span> 否决率：${rr ? rr.value : 0}%`
+          <span style="color:#b03424">●</span> 违规率：${vr ? vr.value : 0}%<br/>
+          <span style="color:#b07d2a">●</span> 否决率：${rr ? rr.value : 0}%`
       }
     },
     legend: { data: ['违规率', '否决率'], top: 0, right: 0, textStyle: { fontSize: 11 } },
@@ -413,7 +404,7 @@ function renderViolationChart() {
         type: 'line',
         data: violationRates,
         smooth: true,
-        itemStyle: { color: '#f56c6c' },
+        itemStyle: { color: '#b03424' },
         lineStyle: { width: 2 },
         symbol: 'circle',
         symbolSize: 5,
@@ -423,7 +414,7 @@ function renderViolationChart() {
         type: 'line',
         data: rejectionRates,
         smooth: true,
-        itemStyle: { color: '#e6a23c' },
+        itemStyle: { color: '#b07d2a' },
         lineStyle: { width: 2 },
         symbol: 'circle',
         symbolSize: 5,
@@ -470,7 +461,7 @@ function renderAgentChart(data) {
           type: 'bar',
           stack: 'total',
           data: scoredCounts,
-          itemStyle: { color: '#409eff' },
+          itemStyle: { color: '#b0442c' },
           label: { show: true, position: 'insideRight', formatter: (p) => p.value > 0 ? p.value : '' }
         },
         {
@@ -478,7 +469,7 @@ function renderAgentChart(data) {
           type: 'bar',
           stack: 'total',
           data: unscoredCounts,
-          itemStyle: { color: '#e6a23c' },
+          itemStyle: { color: '#b07d2a' },
           label: { show: true, position: 'insideRight', formatter: (p) => p.value > 0 ? p.value : '' }
         }
       ]
@@ -523,7 +514,7 @@ function renderAgentChart(data) {
     series: [{
       type: 'bar',
       data: values.reverse(),
-      itemStyle: { color: '#409eff' },
+      itemStyle: { color: '#b0442c' },
       label: { show: true, position: 'right', formatter: `{c}${unit}` }
     }]
   })
@@ -540,6 +531,7 @@ function renderRuleChart(data) {
 
   const top10 = data.slice(0, 10)
   ruleChart.setOption({
+    color: ['#b0442c', '#211d18', '#b07d2a', '#3d7a4f', '#8a8175', '#d3a08f', '#57503f', '#d3ccbd', '#8f3520', '#a89e8f'],
     tooltip: { trigger: 'item', formatter: '{b}: {c}次' },
     series: [{
       type: 'pie',
@@ -577,16 +569,9 @@ onUnmounted(() => {
 
 .page-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-  margin-bottom: 20px;
-}
-
-.page-header h2 {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
+  margin-bottom: 24px;
 }
 
 .header-filters {
@@ -600,29 +585,32 @@ onUnmounted(() => {
 }
 
 .stat-card {
-  cursor: pointer;
-  transition: transform 0.3s;
+  transition: border-color var(--va-duration) var(--va-ease);
 }
 
 .stat-card:hover {
-  transform: translateY(-3px);
+  border-color: var(--va-hairline-dark);
+}
+
+.stat-card-accent {
+  border-top: 2px solid var(--va-accent);
 }
 
 .stat-content {
   display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 8px 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 4px 0;
 }
 
 .stat-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
+  color: var(--va-muted);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.stat-icon.accent {
+  color: var(--va-accent);
 }
 
 .stat-info {
@@ -630,19 +618,34 @@ onUnmounted(() => {
 }
 
 .stat-value {
-  font-size: 26px;
-  font-weight: bold;
-  color: #333;
+  font-family: var(--va-font-display);
+  font-size: 34px;
+  font-weight: 700;
+  color: var(--va-ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  margin-top: 6px;
+}
+
+.stat-value.accent {
+  color: var(--va-accent);
+}
+
+.stat-unit {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--va-muted);
+  margin-left: 2px;
 }
 
 .stat-label {
-  font-size: 13px;
-  color: #999;
-  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--va-muted);
+  letter-spacing: 0.06em;
 }
 
 .detail-card {
-  padding: 8px 0;
+  padding: 4px 0;
 }
 
 .detail-item {
@@ -650,7 +653,7 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 10px 16px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--va-hairline);
 }
 
 .detail-item:last-child {
@@ -658,25 +661,27 @@ onUnmounted(() => {
 }
 
 .detail-label {
-  color: #666;
-  font-size: 14px;
+  color: var(--va-muted);
+  font-size: 13.5px;
 }
 
 .detail-value {
-  font-size: 16px;
-  font-weight: bold;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--va-ink);
+  font-variant-numeric: tabular-nums;
 }
 
 .detail-value.bonus {
-  color: #67c23a;
+  color: var(--va-success);
 }
 
 .detail-value.deduction {
-  color: #f56c6c;
+  color: var(--va-danger);
 }
 
 .detail-value.rejection {
-  color: #e6a23c;
+  color: var(--va-warning);
 }
 
 .chart-row {
@@ -688,9 +693,11 @@ onUnmounted(() => {
 }
 
 .card-title {
-  font-weight: bold;
-  font-size: 15px;
-  color: #303133;
+  font-family: var(--va-font-display);
+  font-weight: 700;
+  font-size: 15.5px;
+  color: var(--va-ink);
+  letter-spacing: 0.02em;
 }
 
 .card-header {

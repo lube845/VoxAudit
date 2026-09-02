@@ -239,21 +239,21 @@ function formatScoreLabel(label) {
 
 function getScoreColor(label) {
   const colors = {
-    '<0': '#F56C6C',
-    '0-60': '#F56C6C',
-    '60-70': '#E6A23C',
-    '70-80': '#409EFF',
-    '80-90': '#67C23A',
-    '90-100': '#909399',
-    '>100': '#909399'
+    '<0': '#b03424',
+    '0-60': '#b03424',
+    '60-70': '#b07d2a',
+    '70-80': '#b0442c',
+    '80-90': '#3d7a4f',
+    '90-100': 'var(--va-muted)',
+    '>100': 'var(--va-muted)'
   }
-  return colors[label] || '#409EFF'
+  return colors[label] || '#b0442c'
 }
 
 function getPassRateColor(rate) {
-  if (rate >= 80) return '#67C23A'
-  if (rate >= 60) return '#E6A23C'
-  return '#F56C6C'
+  if (rate >= 80) return '#3d7a4f'
+  if (rate >= 60) return '#b07d2a'
+  return '#b03424'
 }
 
 async function loadOverview() {
@@ -319,7 +319,7 @@ onMounted(() => {
 
 .stat-card {
   background: #fff;
-  border-radius: 8px;
+  border-radius: var(--va-radius-md);
   padding: 20px;
   text-align: center;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
@@ -328,12 +328,12 @@ onMounted(() => {
 .stat-value {
   font-size: 28px;
   font-weight: 600;
-  color: #303133;
+  color: var(--va-ink);
 }
 
 .stat-label {
   font-size: 14px;
-  color: #909399;
+  color: var(--va-muted);
   margin-top: 8px;
 }
 
@@ -348,17 +348,17 @@ onMounted(() => {
 }
 
 .score-high {
-  color: #67c23a;
+  color: #3d7a4f;
   font-weight: 600;
 }
 
 .score-mid {
-  color: #e6a23c;
+  color: #b07d2a;
   font-weight: 600;
 }
 
 .score-low {
-  color: #f56c6c;
+  color: #b03424;
   font-weight: 600;
 }
 
@@ -369,28 +369,32 @@ onMounted(() => {
 .detail-stat {
   text-align: center;
   padding: 15px;
-  background: #f5f7fa;
-  border-radius: 8px;
+  background: var(--va-paper-deep);
+  border: 1px solid var(--va-hairline);
+  border-radius: var(--va-radius-md);
 }
 
 .detail-stat.highlight {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--va-ink);
+  border-color: var(--va-ink);
 }
 
 .detail-stat.highlight .detail-stat-value,
 .detail-stat.highlight .detail-stat-label {
-  color: #fff;
+  color: #faf8f4;
 }
 
 .detail-stat-value {
+  font-family: var(--va-font-display);
   font-size: 24px;
-  font-weight: 600;
-  color: #303133;
+  font-weight: 700;
+  color: var(--va-ink);
+  font-variant-numeric: tabular-nums;
 }
 
 .detail-stat-label {
-  font-size: 14px;
-  color: #909399;
+  font-size: 13px;
+  color: var(--va-muted);
   margin-top: 4px;
 }
 
@@ -400,7 +404,7 @@ onMounted(() => {
 
 .rate-label {
   font-size: 14px;
-  color: #606266;
+  color: var(--va-ink-soft);
   margin-bottom: 8px;
   display: block;
 }
@@ -408,7 +412,7 @@ onMounted(() => {
 .section-title {
   font-size: 16px;
   font-weight: 600;
-  color: #303133;
+  color: var(--va-ink);
   margin-bottom: 12px;
 }
 
@@ -427,7 +431,7 @@ onMounted(() => {
 }
 
 .timeline-item {
-  background: #f5f7fa;
+  background: var(--va-paper-deep);
   padding: 8px 12px;
   border-radius: 4px;
   min-width: 80px;
@@ -436,12 +440,12 @@ onMounted(() => {
 
 .timeline-date {
   font-size: 12px;
-  color: #909399;
+  color: var(--va-muted);
 }
 
 .timeline-count {
   font-size: 16px;
   font-weight: 600;
-  color: #409eff;
+  color: #b0442c;
 }
 </style>

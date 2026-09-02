@@ -2,10 +2,7 @@
   <div class="rules-page">
     <!-- 页面标题 -->
     <div class="page-header">
-      <div class="header-left">
-        <h2>评分规则管理</h2>
-        <p class="subtitle">管理加分规则和扣分规则</p>
-      </div>
+      <p class="subtitle">管理加分规则和扣分规则，支持版本回溯与复合评分</p>
       <div class="header-actions">
         <el-button type="warning" size="small" @click="showImportDialog" class="import-btn">
           <el-icon><Upload /></el-icon>
@@ -50,7 +47,7 @@
       <template #header>
         <div class="card-header">
           <div class="card-title">
-            <span class="icon"><Star :size="18" color="#e6a23c" fill="#e6a23c" /></span>
+            <span class="icon"><Star :size="18" color="#b07d2a" fill="#b07d2a" /></span>
             <span>加分规则</span>
             <el-tag type="success" size="small" effect="plain">{{ bonusTotal }} 条</el-tag>
           </div>
@@ -81,8 +78,8 @@
           <template #default="{ row }">
             <el-switch
               v-model="row.is_enabled"
-              active-color="#67c23a"
-              inactive-color="#909399"
+              active-color="#3d7a4f"
+              inactive-color="#8a8175"
               :disabled="!row.is_latest"
               @change="toggleEnabled(row)"
             />
@@ -118,7 +115,7 @@
       <template #header>
         <div class="card-header">
           <div class="card-title">
-            <span class="icon"><TrendingDown :size="18" color="#f56c6c" /></span>
+            <span class="icon"><TrendingDown :size="18" color="#b03424" /></span>
             <span>扣分规则</span>
             <el-tag type="danger" size="small" effect="plain">{{ deductionTotal }} 条</el-tag>
           </div>
@@ -155,8 +152,8 @@
           <template #default="{ row }">
             <el-switch
               v-model="row.is_enabled"
-              active-color="#67c23a"
-              inactive-color="#909399"
+              active-color="#3d7a4f"
+              inactive-color="#8a8175"
               :disabled="!row.is_latest"
               @change="toggleEnabled(row)"
             />
@@ -249,7 +246,7 @@
           </el-button>
         </el-form-item>
         <el-form-item v-if="form.rule_type === 'deduction'" label="否决项">
-          <el-switch v-model="form.is_veto" active-color="#f56c6c" inactive-color="#909399" />
+          <el-switch v-model="form.is_veto" active-color="#b03424" inactive-color="#8a8175" />
           <span class="veto-tip">（否决项规则可直接否决评分）</span>
         </el-form-item>
       </el-form>
@@ -746,17 +743,10 @@ onMounted(() => {
 }
 
 .page-header {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-.header-left h2 {
-  margin: 0 0 8px 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
 }
 
 .header-actions {
@@ -764,29 +754,18 @@ onMounted(() => {
   gap: 10px;
 }
 
-.export-btn {
-  background: linear-gradient(135deg, #67c23a 0%, #85ce61 100%);
-  border: none;
-  font-weight: 500;
-}
-
-.import-btn {
-  background: linear-gradient(135deg, #e6a23c 0%, #f56c6c 100%);
-  border: none;
-  font-weight: 500;
-}
-
 .subtitle {
   margin: 0;
-  color: #909399;
-  font-size: 14px;
+  color: var(--va-muted);
+  font-size: 13px;
+  letter-spacing: 0.02em;
 }
 
 .rules-card {
   margin-bottom: 20px;
-  border-radius: 8px;
-  border: none;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
+  border-radius: var(--va-radius-md);
+  border: 1px solid var(--va-hairline);
+  box-shadow: none;
 }
 
 .card-header {
@@ -799,9 +778,11 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
+  font-family: var(--va-font-display);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--va-ink);
+  letter-spacing: 0.02em;
 }
 
 .card-title .icon {
@@ -810,19 +791,15 @@ onMounted(() => {
 }
 
 .create-btn {
-  background: linear-gradient(135deg, #67c23a 0%, #85ce61 100%);
-  border: none;
   font-weight: 500;
 }
 
 .create-btn-deduction {
-  background: linear-gradient(135deg, #f56c6c 0%, #f78989 100%);
-  border: none;
   font-weight: 500;
 }
 
 .rules-table {
-  border-radius: 8px;
+  border-radius: var(--va-radius-md);
   overflow: hidden;
 }
 
@@ -834,15 +811,15 @@ onMounted(() => {
 
 .rule-name {
   font-weight: 500;
-  color: #303133;
+  color: #211d18;
 }
 
 .code-tag {
-  background: #f5f7fa;
+  background: var(--va-paper-deep);
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 12px;
-  color: #606266;
+  color: #4a443b;
   font-family: Consolas, Monaco, monospace;
 }
 
@@ -852,30 +829,30 @@ onMounted(() => {
 }
 
 .score.bonus {
-  color: #67c23a;
+  color: #3d7a4f;
 }
 
 .score.deduction {
-  color: #f56c6c;
+  color: #b03424;
 }
 
 .no-veto {
-  color: #909399;
+  color: #8a8175;
   font-size: 13px;
 }
 
 .veto-tip {
   margin-left: 10px;
-  color: #909399;
+  color: #8a8175;
   font-size: 12px;
 }
 
 .radio-label.bonus {
-  color: #67c23a;
+  color: #3d7a4f;
 }
 
 .radio-label.deduction {
-  color: #f56c6c;
+  color: #b03424;
 }
 
 .rule-form {
@@ -884,8 +861,8 @@ onMounted(() => {
 
 :deep(.el-card__header) {
   padding: 16px 20px;
-  border-bottom: 1px solid #f0f0f0;
-  background: #fafafa;
+  border-bottom: 1px solid var(--va-hairline);
+  background: var(--va-paper-deep);
 }
 
 :deep(.el-card__body) {
@@ -893,8 +870,8 @@ onMounted(() => {
 }
 
 :deep(.el-table th) {
-  background: #fafafa !important;
-  color: #606266;
+  background: var(--va-paper-deep) !important;
+  color: #4a443b;
   font-weight: 600;
   font-size: 13px;
 }
@@ -904,7 +881,7 @@ onMounted(() => {
 }
 
 :deep(.el-table--striped .el-table__body tr.el-table__row--striped td) {
-  background: #fafafa;
+  background: var(--va-paper-deep);
 }
 
 :deep(.el-button-link) {
@@ -914,7 +891,7 @@ onMounted(() => {
 
 :deep(.el-dialog__header) {
   padding: 20px 20px 10px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--va-hairline);
 }
 
 :deep(.el-dialog__body) {
@@ -923,7 +900,7 @@ onMounted(() => {
 
 :deep(.el-dialog__footer) {
   padding: 10px 20px 20px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid var(--va-hairline);
 }
 
 .refine-preview {
@@ -933,44 +910,44 @@ onMounted(() => {
 }
 
 .original-text, .refined-text {
-  background: #f5f7fa;
-  border-radius: 8px;
+  background: var(--va-paper-deep);
+  border-radius: var(--va-radius-md);
   padding: 12px 16px;
 }
 
 .original-text .label, .refined-text .label {
   font-size: 12px;
-  color: #909399;
+  color: #8a8175;
   margin-bottom: 6px;
 }
 
 .original-text .content {
-  color: #606266;
+  color: #4a443b;
   line-height: 1.6;
   white-space: pre-wrap;
 }
 
 .refined-text .content {
-  color: #303133;
+  color: #211d18;
   line-height: 1.6;
   white-space: pre-wrap;
 }
 
 .refined-text {
-  background: #ecf5ff;
-  border: 1px solid #409eff30;
+  background: var(--va-accent-soft);
+  border: 1px solid #b0442c30;
 }
 
 .divider {
   display: flex;
   justify-content: center;
-  color: #409eff;
+  color: #b0442c;
 }
 
 .loading-text {
   text-align: center;
   padding: 40px;
-  color: #909399;
+  color: #8a8175;
 }
 
 .description-textarea-wrapper {
@@ -993,10 +970,10 @@ onMounted(() => {
   z-index: 2;
   padding: 4px !important;
   min-height: auto !important;
-  color: #909399 !important;
+  color: #8a8175 !important;
 }
 
 .expand-btn:hover {
-  color: #409eff !important;
+  color: #b0442c !important;
 }
 </style>

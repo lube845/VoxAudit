@@ -31,7 +31,7 @@
             </el-descriptions-item>
             <el-descriptions-item label="上传时间">{{ formatDate(recording.created_at) }}</el-descriptions-item>
             <el-descriptions-item v-if="recording.remark" label="备注">
-              <span style="color: #f56c6c">{{ recording.remark }}</span>
+              <span style="color: #b03424">{{ recording.remark }}</span>
             </el-descriptions-item>
           </el-descriptions>
         </el-card>
@@ -43,13 +43,13 @@
           </template>
            <el-descriptions :column="2" border>
             <el-descriptions-item label="加分总分">
-              <span style="color: #67c23a; font-weight: bold">{{ scoringResult.bonus_score || 0 }}</span>
+              <span style="color: #3d7a4f; font-weight: bold">{{ scoringResult.bonus_score || 0 }}</span>
             </el-descriptions-item>
             <el-descriptions-item label="减分总分">
-              <span style="color: #f56c6c; font-weight: bold">{{ scoringResult.deduction_score || 0 }}</span>
+              <span style="color: #b03424; font-weight: bold">{{ scoringResult.deduction_score || 0 }}</span>
             </el-descriptions-item>
             <el-descriptions-item label="总分" :span="2">
-              <span :style="{ color: scoringResult.total_score >= 60 ? '#67c23a' : scoringResult.total_score < 0 ? '#f56c6c' : '' }" style="font-weight: bold">
+              <span :style="{ color: scoringResult.total_score >= 60 ? '#3d7a4f' : scoringResult.total_score < 0 ? '#b03424' : '' }" style="font-weight: bold">
                 {{ scoringResult.total_score >= 0 ? '+' : '' }}{{ scoringResult.total_score }}
               </span>
             </el-descriptions-item>
@@ -103,13 +103,13 @@
               <el-table-column prop="item_name" label="考核项" />
               <el-table-column prop="score" label="得分" width="80">
                 <template #default="{ row }">
-                  <span style="color: #67c23a">{{ row.score || 0 }}</span>
+                  <span style="color: #3d7a4f">{{ row.score || 0 }}</span>
                 </template>
               </el-table-column>
               <el-table-column prop="is_veto" label="是否否决项" width="100">
                 <template #default="{ row }">
                   <el-tag v-if="row.is_veto" type="danger" size="small">是</el-tag>
-                  <span v-else style="color: #999">否</span>
+                  <span v-else style="color: var(--va-muted)">否</span>
                 </template>
               </el-table-column>
               <el-table-column prop="matched_text" label="匹配文本" show-overflow-tooltip />
@@ -123,13 +123,13 @@
               <el-table-column prop="item_name" label="考核项" />
               <el-table-column prop="score" label="扣分" width="80">
                 <template #default="{ row }">
-                  <span style="color: #f56c6c">{{ Math.abs(row.score) }}</span>
+                  <span style="color: #b03424">{{ Math.abs(row.score) }}</span>
                 </template>
               </el-table-column>
               <el-table-column prop="is_veto" label="是否否决项" width="100">
                 <template #default="{ row }">
                   <el-tag v-if="row.is_veto" type="danger" size="small">是</el-tag>
-                  <span v-else style="color: #999">否</span>
+                  <span v-else style="color: var(--va-muted)">否</span>
                 </template>
               </el-table-column>
               <el-table-column prop="matched_text" label="匹配文本" show-overflow-tooltip />
@@ -379,14 +379,14 @@ watch(() => route.params.id, (newId) => {
 }
 .score-section-title {
   font-size: 14px;
-  color: #909399;
+  color: var(--va-muted);
   margin-bottom: 8px;
 }
 .score-section .bonus {
-  color: #67c23a;
+  color: #3d7a4f;
 }
 .score-section .deduction {
-  color: #f56c6c;
+  color: #b03424;
 }
 .score-info {
   text-align: center;
@@ -396,15 +396,15 @@ watch(() => route.params.id, (newId) => {
 .score-value {
   font-size: 48px;
   font-weight: bold;
-  color: #67c23a;
+  color: #3d7a4f;
 }
 
 .score-value.rejected {
-  color: #f56c6c;
+  color: #b03424;
 }
 
 .score-label {
-  color: #999;
+  color: var(--va-muted);
   margin-top: 10px;
 }
 
@@ -420,27 +420,30 @@ watch(() => route.params.id, (newId) => {
 }
 
 .transcript-segment {
-  padding: 10px;
-  margin-bottom: 10px;
-  border-radius: 5px;
-  transition: background 0.3s;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: var(--va-radius-sm);
+  border-left: 2px solid transparent;
+  transition: background var(--va-duration) var(--va-ease);
 }
 
 .transcript-segment:hover {
-  background: #f5f7fa;
+  background: var(--va-paper-deep);
 }
 
 .transcript-segment.agent {
-  background: #e6f7ff;
+  background: var(--va-accent-soft);
+  border-left-color: var(--va-accent);
 }
 
 .transcript-segment.customer {
-  background: #f6ffed;
+  background: var(--va-paper-deep);
+  border-left-color: var(--va-hairline-dark);
 }
 
 .segment-speaker {
   font-size: 12px;
-  color: #999;
+  color: var(--va-muted);
   margin-bottom: 5px;
 }
 
@@ -454,15 +457,15 @@ watch(() => route.params.id, (newId) => {
 }
 
 .highlight-red {
-  background: #ffebeb;
-  color: #f56c6c;
+  background: #f7e4e1;
+  color: #b03424;
   padding: 2px 5px;
   border-radius: 3px;
 }
 
 .highlight-green {
-  background: #f0f9eb;
-  color: #67c23a;
+  background: #e3eee4;
+  color: #3d7a4f;
   padding: 2px 5px;
   border-radius: 3px;
 }
@@ -489,11 +492,11 @@ watch(() => route.params.id, (newId) => {
   font-size: 14px;
 }
 .type-bubble.bonus {
-  background-color: #67c23a;
+  background-color: #3d7a4f;
   color: white;
 }
 .type-bubble.deduction {
-  background-color: #f56c6c;
+  background-color: #b03424;
   color: white;
 }
 </style>

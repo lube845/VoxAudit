@@ -18,7 +18,7 @@ body {
 
 #app {
   min-height: 100vh;
-  background-color: #f5f5f5;
+  background-color: var(--va-paper);
 }
 
 /* Lucide 图标在 el-icon 内随字号缩放 */

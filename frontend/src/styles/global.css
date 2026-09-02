@@ -1,0 +1,193 @@
+/* ============================================================
+   VoxAudit 设计令牌 — 东方编辑风
+   纸感米白 · 墨色文字 · 朱砂单一强调色
+   ============================================================ */
+
+:root {
+  /* 品牌色板 */
+  --va-paper: #faf8f4;
+  --va-paper-deep: #f2efe8;
+  --va-ink: #211d18;
+  --va-ink-soft: #4a443b;
+  --va-muted: #8a8175;
+  --va-hairline: #e4ded2;
+  --va-hairline-dark: #d3ccbd;
+  --va-accent: #b0442c;
+  --va-accent-deep: #8f3520;
+  --va-accent-soft: #f5e3dd;
+  --va-success: #3d7a4f;
+  --va-warning: #b07d2a;
+  --va-danger: #b03424;
+
+  /* 字体 */
+  --va-font-display: 'Songti SC', 'STSong', 'Noto Serif SC', 'SimSun', serif;
+  --va-font-body: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+
+  /* 圆角：编辑风小圆角 */
+  --va-radius-sm: 3px;
+  --va-radius-md: 5px;
+
+  /* 动效 */
+  --va-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --va-duration: 200ms;
+
+  /* ---- Element Plus 变量覆盖 ---- */
+  --el-color-primary: var(--va-accent);
+  --el-color-primary-light-3: color-mix(in oklab, var(--va-accent) 55%, white);
+  --el-color-primary-light-5: color-mix(in oklab, var(--va-accent) 35%, white);
+  --el-color-primary-light-7: color-mix(in oklab, var(--va-accent) 20%, white);
+  --el-color-primary-light-8: color-mix(in oklab, var(--va-accent) 12%, white);
+  --el-color-primary-light-9: var(--va-accent-soft);
+  --el-color-primary-dark-2: var(--va-accent-deep);
+  --el-color-success: var(--va-success);
+  --el-color-warning: var(--va-warning);
+  --el-color-danger: var(--va-danger);
+  --el-color-error: var(--va-danger);
+
+  --el-text-color-primary: var(--va-ink);
+  --el-text-color-regular: var(--va-ink-soft);
+  --el-text-color-secondary: var(--va-muted);
+  --el-text-color-placeholder: #a89e8f;
+
+  --el-border-color: var(--va-hairline-dark);
+  --el-border-color-light: var(--va-hairline);
+  --el-border-color-lighter: var(--va-hairline);
+  --el-border-color-extra-light: #efeadd;
+
+  --el-fill-color: var(--va-paper-deep);
+  --el-fill-color-light: #f6f3ec;
+  --el-fill-color-lighter: var(--va-paper);
+  --el-fill-color-blank: #ffffff;
+
+  --el-bg-color: #ffffff;
+  --el-bg-color-page: var(--va-paper);
+
+  --el-border-radius-base: var(--va-radius-sm);
+  --el-border-radius-small: 2px;
+  --el-border-radius-round: 999px;
+
+  --el-font-family: var(--va-font-body);
+  --el-box-shadow: 0 1px 2px rgba(33, 29, 24, 0.05);
+  --el-box-shadow-light: 0 1px 3px rgba(33, 29, 24, 0.06);
+  --el-box-shadow-lighter: 0 1px 2px rgba(33, 29, 24, 0.04);
+  --el-box-shadow-dark: 0 4px 16px rgba(33, 29, 24, 0.1);
+}
+
+/* ---- 全局基础 ---- */
+body {
+  background-color: var(--va-paper);
+  color: var(--va-ink);
+  font-family: var(--va-font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--va-accent-soft);
+  color: var(--va-accent-deep);
+}
+
+/* 滚动条：细、墨色 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--va-hairline-dark);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--va-muted);
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ---- Element Plus 组件精修 ---- */
+
+/* 卡片：发丝线边框，去厚阴影 */
+.el-card {
+  border: 1px solid var(--va-hairline);
+  border-radius: var(--va-radius-md);
+  box-shadow: none;
+  color: var(--va-ink);
+}
+.el-card__header {
+  border-bottom: 1px solid var(--va-hairline);
+  padding: 14px 20px;
+}
+.el-card.is-hover-shadow:hover {
+  box-shadow: 0 2px 8px rgba(33, 29, 24, 0.06);
+}
+
+/* 表格：紧凑、发丝线 */
+.el-table {
+  --el-table-border-color: var(--va-hairline);
+  --el-table-header-bg-color: var(--va-paper-deep);
+  --el-table-header-text-color: var(--va-ink-soft);
+  --el-table-row-hover-bg-color: #f7f4ed;
+}
+.el-table th.el-table__cell {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* 按钮：过渡克制 */
+.el-button {
+  transition: all var(--va-duration) var(--va-ease);
+  font-weight: 500;
+}
+
+/* 对话框 */
+.el-dialog {
+  border-radius: var(--va-radius-md);
+  border: 1px solid var(--va-hairline);
+  box-shadow: 0 8px 40px rgba(33, 29, 24, 0.14);
+}
+.el-dialog__title {
+  font-family: var(--va-font-display);
+  font-weight: 700;
+  font-size: 18px;
+}
+
+/* 输入框聚焦 */
+.el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px var(--va-accent) inset;
+}
+
+/* 标签：编辑风小标签 */
+.el-tag {
+  border-radius: 2px;
+  font-weight: 500;
+}
+
+/* 分页 */
+.el-pagination {
+  --el-pagination-hover-color: var(--va-accent);
+}
+
+/* 菜单激活指示色 */
+.el-menu {
+  --el-menu-active-color: var(--va-accent);
+  --el-menu-hover-bg-color: var(--va-paper-deep);
+}
+
+/* Message 消息条 */
+.el-message {
+  border-radius: var(--va-radius-sm);
+  box-shadow: 0 4px 16px rgba(33, 29, 24, 0.1);
+}
+
+/* ---- 通用工具类 ---- */
+
+/* 编辑风页面标题 */
+.va-page-title {
+  font-family: var(--va-font-display);
+  font-weight: 700;
+  color: var(--va-ink);
+  letter-spacing: 0.01em;
+}
+
+/* 等宽数字 */
+.va-nums {
+  font-variant-numeric: tabular-nums;
+}
