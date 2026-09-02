@@ -157,3 +157,4 @@ backend.zip
 /docker/images/
 
 .claude/
+.workbuddy/

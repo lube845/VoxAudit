@@ -5,7 +5,7 @@
         <div class="card-header">
           <span>存储概览</span>
           <el-button type="primary" link @click="refreshStorageInfo">
-            <el-icon><Refresh /></el-icon> 刷新
+            <el-icon><RefreshCw /></el-icon> 刷新
           </el-button>
         </div>
       </template>
@@ -75,7 +75,7 @@
           <div class="list-header">
             <span>录音文件列表 ({{ objectList.length }} 个)</span>
             <el-button type="primary" link @click="loadObjects">
-              <el-icon><Refresh /></el-icon> 刷新
+              <el-icon><RefreshCw /></el-icon> 刷新
             </el-button>
           </div>
 
@@ -128,7 +128,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Refresh } from '@element-plus/icons-vue'
+import { RefreshCw } from 'lucide-vue-next'
 import api from '@/api'
 
 const loading = ref(false)

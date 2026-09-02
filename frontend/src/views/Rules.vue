@@ -50,7 +50,7 @@
       <template #header>
         <div class="card-header">
           <div class="card-title">
-            <span class="icon">⭐</span>
+            <span class="icon"><Star :size="18" color="#e6a23c" fill="#e6a23c" /></span>
             <span>加分规则</span>
             <el-tag type="success" size="small" effect="plain">{{ bonusTotal }} 条</el-tag>
           </div>
@@ -118,7 +118,7 @@
       <template #header>
         <div class="card-header">
           <div class="card-title">
-            <span class="icon">📉</span>
+            <span class="icon"><TrendingDown :size="18" color="#f56c6c" /></span>
             <span>扣分规则</span>
             <el-tag type="danger" size="small" effect="plain">{{ deductionTotal }} 条</el-tag>
           </div>
@@ -240,11 +240,11 @@
         <el-form-item label="描述" prop="description">
           <div class="description-textarea-wrapper">
             <el-input v-model="form.description" type="textarea" rows="3" placeholder="规则描述必填，越清晰越好，大模型根据该字段来理解规则" maxlength="1500" show-word-limit />
-            <el-button class="expand-btn" :icon="Expand" text @click="openExpandDialog" title="放大编辑" />
+            <el-button class="expand-btn" :icon="Maximize2" text @click="openExpandDialog" title="放大编辑" />
           </div>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" plain @click="refineDescription" :loading="refiningDescription" :icon="MagicStick">
+          <el-button type="primary" plain @click="refineDescription" :loading="refiningDescription" :icon="WandSparkles">
             AI细化描述
           </el-button>
         </el-form-item>
@@ -277,7 +277,7 @@
         </div>
       </div>
       <div v-else class="loading-text">
-        <el-icon class="is-loading"><Loading /></el-icon>
+        <el-icon class="is-loading"><LoaderCircle /></el-icon>
         正在细化描述，请稍候...
       </div>
       <template #footer>
@@ -344,7 +344,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Plus, Download, Upload, MagicStick, ArrowRight, Loading, Expand } from '@element-plus/icons-vue'
+import { Plus, Download, Upload, WandSparkles, ArrowRight, LoaderCircle, Maximize2, Star, TrendingDown } from 'lucide-vue-next'
 import { formatDate, getTimezone } from '@/utils/timezone'
 import api from '@/api'
 
@@ -805,7 +805,8 @@ onMounted(() => {
 }
 
 .card-title .icon {
-  font-size: 20px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .create-btn {

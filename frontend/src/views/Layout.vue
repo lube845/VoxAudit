@@ -4,7 +4,7 @@
     <el-aside width="240px" class="sidebar">
       <div class="sidebar-header">
         <div class="logo">
-          <span class="logo-icon">🎯</span>
+          <AudioLines :size="28" class="logo-icon" />
           <span class="logo-text">语音质检助手</span>
         </div>
       </div>
@@ -19,31 +19,31 @@
         :unique-opened="true"
       >
         <el-menu-item index="/home">
-          <el-icon><HomeFilled /></el-icon>
+          <el-icon><LayoutDashboard /></el-icon>
           <template #title>数据概览</template>
         </el-menu-item>
         <el-menu-item index="/rules">
-          <el-icon><Setting /></el-icon>
+          <el-icon><ListChecks /></el-icon>
           <template #title>规则管理</template>
         </el-menu-item>
         <el-menu-item index="/recordings">
-          <el-icon><Microphone /></el-icon>
+          <el-icon><Mic /></el-icon>
           <template #title>录音管理</template>
         </el-menu-item>
         <el-menu-item index="/export">
-          <el-icon><Download /></el-icon>
+          <el-icon><FileDown /></el-icon>
           <template #title>导出报告</template>
         </el-menu-item>
         <el-menu-item v-if="isAdmin" index="/storage">
-          <el-icon><Delete /></el-icon>
+          <el-icon><Trash2 /></el-icon>
           <template #title>存储清理</template>
         </el-menu-item>
         <el-menu-item v-if="isAdmin" index="/user-stats">
-          <el-icon><User /></el-icon>
+          <el-icon><Users /></el-icon>
           <template #title>用户统计</template>
         </el-menu-item>
         <el-menu-item v-if="isAdmin" index="/system-settings">
-          <el-icon><Tools /></el-icon>
+          <el-icon><Settings /></el-icon>
           <template #title>系统设置</template>
         </el-menu-item>
       </el-menu>
@@ -71,7 +71,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Setting, Microphone, HomeFilled, Download, Delete, User, Tools } from '@element-plus/icons-vue'
+import { AudioLines, LayoutDashboard, ListChecks, Mic, FileDown, Trash2, Users, Settings } from 'lucide-vue-next'
 import { now, formatDate } from '@/utils/timezone'
 import api from '@/api'
 
@@ -134,7 +134,8 @@ onUnmounted(() => {
 }
 
 .logo-icon {
-  font-size: 28px;
+  color: #a78bfa;
+  flex-shrink: 0;
 }
 
 .logo-text {

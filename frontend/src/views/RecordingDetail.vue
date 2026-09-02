@@ -147,7 +147,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Download } from '@element-plus/icons-vue'
+import { Download } from 'lucide-vue-next'
 import { formatDate } from '@/utils/timezone'
 import api from '@/api'
 

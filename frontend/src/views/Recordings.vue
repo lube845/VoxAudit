@@ -24,7 +24,7 @@
               上传录音
             </el-button>
             <el-button @click="handleRefresh" :loading="refreshing">
-              <el-icon><RefreshRight /></el-icon>
+              <el-icon><RotateCw /></el-icon>
               刷新状态
             </el-button>
           </div>
@@ -278,7 +278,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Upload, RefreshRight } from '@element-plus/icons-vue'
+import { Search, Upload, RotateCw } from 'lucide-vue-next'
 import { formatDate, now } from '@/utils/timezone'
 import CryptoJS from 'crypto-js'
 import api from '@/api'

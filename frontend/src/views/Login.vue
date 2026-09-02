@@ -7,7 +7,7 @@
           <el-input
             v-model="form.loginid"
             placeholder="工号"
-            prefix-icon="User"
+            :prefix-icon="User"
             size="large"
           />
         </el-form-item>
@@ -16,13 +16,13 @@
             v-model="form.password"
             :type="showPassword ? 'text' : 'password'"
             placeholder="OA密码"
-            prefix-icon="Lock"
+            :prefix-icon="Lock"
             size="large"
             @keyup.enter="handleLogin"
           >
             <template #suffix>
               <el-icon class="password-toggle" @click="showPassword = !showPassword">
-                <component :is="showPassword ? 'Eye' : 'Hide'" />
+                <component :is="showPassword ? Eye : EyeOff" />
               </el-icon>
             </template>
           </el-input>
@@ -47,6 +47,7 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { User, Lock, Eye, EyeOff } from 'lucide-vue-next'
 import api from '@/api'
 
 const router = useRouter()

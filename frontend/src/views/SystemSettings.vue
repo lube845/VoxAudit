@@ -10,7 +10,7 @@
         <el-card class="config-card" shadow="hover">
           <template #header>
             <div class="card-title">
-              <el-icon class="card-icon"><Connection /></el-icon>
+              <el-icon class="card-icon"><Plug /></el-icon>
               <span>大模型（LLM）配置</span>
             </div>
           </template>
@@ -26,7 +26,7 @@
               >
                 <template #append>
                   <el-tooltip content="留空则使用环境变量配置" placement="top">
-                    <el-icon><InfoFilled /></el-icon>
+                    <el-icon><Info /></el-icon>
                   </el-tooltip>
                 </template>
               </el-input>
@@ -67,7 +67,7 @@
             </div>
             <div class="footer-right">
               <el-button @click="handleTestLlm" :loading="testingLlm" :type="llmTestResult === true ? 'success' : llmTestResult === false ? 'danger' : 'default'">
-                <el-icon v-if="!testingLlm"><Bell /></el-icon>
+                <el-icon v-if="!testingLlm"><Zap /></el-icon>
                 {{ testingLlm ? '测试中...' : llmTestResult === true ? '测试通过' : llmTestResult === false ? '测试失败' : '测试连通性' }}
               </el-button>
               <el-button type="primary" @click="handleSaveLlm" :loading="savingLlm" :disabled="!canSaveLlm">
@@ -82,7 +82,7 @@
         <el-card class="preview-card" shadow="never">
           <template #header>
             <div class="card-title">
-              <el-icon class="card-icon"><Document /></el-icon>
+              <el-icon class="card-icon"><FileText /></el-icon>
               <span>当前生效配置</span>
             </div>
           </template>
@@ -122,7 +122,7 @@
         <el-card class="config-card" shadow="hover">
           <template #header>
             <div class="card-title">
-              <el-icon class="card-icon"><Microphone /></el-icon>
+              <el-icon class="card-icon"><Mic /></el-icon>
               <span>语音识别（ASR）配置</span>
             </div>
           </template>
@@ -142,7 +142,7 @@
               >
                 <template #append>
                   <el-tooltip content="留空则使用环境变量配置" placement="top">
-                    <el-icon><InfoFilled /></el-icon>
+                    <el-icon><Info /></el-icon>
                   </el-tooltip>
                 </template>
               </el-input>
@@ -155,7 +155,7 @@
             </div>
             <div class="footer-right">
               <el-button @click="handleTestAsr" :loading="testingAsr" :type="asrTestResult === true ? 'success' : asrTestResult === false ? 'danger' : 'default'">
-                <el-icon v-if="!testingAsr"><Bell /></el-icon>
+                <el-icon v-if="!testingAsr"><Zap /></el-icon>
                 {{ testingAsr ? '测试中...' : asrTestResult === true ? '测试通过' : asrTestResult === false ? '测试失败' : '测试连通性' }}
               </el-button>
               <el-button type="primary" @click="handleSaveAsr" :loading="savingAsr" :disabled="!canSaveAsr">
@@ -170,7 +170,7 @@
         <el-card class="preview-card" shadow="never">
           <template #header>
             <div class="card-title">
-              <el-icon class="card-icon"><Document /></el-icon>
+              <el-icon class="card-icon"><FileText /></el-icon>
               <span>当前生效配置</span>
             </div>
           </template>
@@ -195,12 +195,12 @@
           <template #header>
             <div class="card-header">
               <div class="card-title">
-                <el-icon class="card-icon"><ChatDotRound /></el-icon>
+                <el-icon class="card-icon"><MessageSquare /></el-icon>
                 <span>大模型Prompt配置</span>
               </div>
               <div class="header-actions">
                 <el-button @click="handleResetPrompts" :loading="resettingPrompts" size="small">
-                  <el-icon><Refresh /></el-icon>
+                  <el-icon><RotateCcw /></el-icon>
                   重置为默认
                 </el-button>
                 <el-button type="primary" @click="handleSavePrompts" :loading="savingPrompts" :disabled="!hasPromptChanges">
@@ -298,7 +298,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Connection, Setting, Document, Check, InfoFilled, Microphone, Bell, ChatDotRound, Refresh } from '@element-plus/icons-vue'
+import { Plug, FileText, Check, Info, Mic, Zap, MessageSquare, RotateCcw } from 'lucide-vue-next'
 import api from '@/api'
 
 const activeTab = ref('llm')

@@ -16,7 +16,7 @@
               @click="exportType = 'all'"
             >
               <div class="type-icon">
-                <el-icon><Document /></el-icon>
+                <el-icon><FileText /></el-icon>
               </div>
               <div class="type-info">
                 <div class="type-name">整体导出</div>
@@ -115,7 +115,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Download, Document, User, Check } from '@element-plus/icons-vue'
+import { Download, FileText, User, Check } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
 import { now } from '@/utils/timezone'
 import api from '@/api'

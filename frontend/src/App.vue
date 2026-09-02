@@ -20,4 +20,10 @@ body {
   min-height: 100vh;
   background-color: #f5f5f5;
 }
+
+/* Lucide 图标在 el-icon 内随字号缩放 */
+.el-icon svg {
+  width: 1em;
+  height: 1em;
+}
 </style>

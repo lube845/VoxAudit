@@ -8,7 +8,7 @@
           <el-radio-button value="30">近一月</el-radio-button>
         </el-radio-group>
         <el-button text @click="loadAllData">
-          <el-icon><Refresh /></el-icon>
+          <el-icon><RefreshCw /></el-icon>
         </el-button>
       </div>
     </div>
@@ -19,7 +19,7 @@
         <el-card class="stat-card">
           <div class="stat-content">
             <div class="stat-icon" style="background: #409eff">
-              <el-icon :size="28"><Microphone /></el-icon>
+              <el-icon :size="28"><Mic /></el-icon>
             </div>
             <div class="stat-info">
               <div class="stat-value">{{ overview.total_recordings }}</div>
@@ -32,7 +32,7 @@
         <el-card class="stat-card">
           <div class="stat-content">
             <div class="stat-icon" style="background: #67c23a">
-              <el-icon :size="28"><DocumentChecked /></el-icon>
+              <el-icon :size="28"><FileCheckCorner /></el-icon>
             </div>
             <div class="stat-info">
               <div class="stat-value">{{ overview.scored_count }}</div>
@@ -58,7 +58,7 @@
         <el-card class="stat-card">
           <div class="stat-content">
             <div class="stat-icon" style="background: #f56c6c">
-              <el-icon :size="28"><Warning /></el-icon>
+              <el-icon :size="28"><TriangleAlert /></el-icon>
             </div>
             <div class="stat-info">
               <div class="stat-value">{{ violationRate }}%</div>
@@ -191,7 +191,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
-import { Refresh, Microphone, DocumentChecked, Star, Warning } from '@element-plus/icons-vue'
+import { RefreshCw, Mic, FileCheckCorner, Star, TriangleAlert } from 'lucide-vue-next'
 import * as echarts from 'echarts'
 import { now, formatDate } from '@/utils/timezone'
 import api from '@/api'
