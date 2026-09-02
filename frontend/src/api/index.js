@@ -11,7 +11,7 @@ const getUserInfo = () => {
   // 检查会话是否过期
   if (userInfo.login_time) {
     const expireMs = SESSION_EXPIRE_HOURS * 60 * 60 * 1000
-    if (Date.now() - userInfo.login_time > expireMs) {
+    if (Date.now() - userInfo.login_time * 1000 > expireMs) {
       localStorage.removeItem('user_info')
       ElMessage.warning('登录已过期，请重新登录')
       window.location.href = '/login'
