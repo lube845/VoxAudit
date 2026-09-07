@@ -19,7 +19,7 @@
           <el-input
             v-model="form.password"
             :type="showPassword ? 'text' : 'password'"
-            placeholder="OA密码"
+            placeholder="密码"
             :prefix-icon="Lock"
             size="large"
             @keyup.enter="handleLogin"
@@ -44,6 +44,73 @@
         </el-form-item>
       </el-form>
     </div>
+
+    <!-- 强制改密弹窗：k 账号首次登录 / 密码过期时弹出，不让绕过 -->
+    <el-dialog
+      v-model="changePwdDialog.visible"
+      :title="changePwdDialog.title"
+      width="440px"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      :show-close="false"
+      align-center
+    >
+      <el-alert
+        v-if="changePwdDialog.title"
+        :title="changePwdDialog.title"
+        type="warning"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 16px"
+      />
+      <el-form
+        ref="changePwdFormRef"
+        :model="changePwdDialog.form"
+        :rules="changePwdDialog.rules"
+        label-width="92px"
+        @submit.prevent
+      >
+        <el-form-item label="旧密码" prop="old_password">
+          <el-input
+            v-model="changePwdDialog.form.old_password"
+            type="password"
+            placeholder="请输入当前密码"
+            show-password
+            autocomplete="current-password"
+          />
+        </el-form-item>
+        <el-form-item label="新密码" prop="new_password">
+          <el-input
+            v-model="changePwdDialog.form.new_password"
+            type="password"
+            placeholder="请输入新密码（至少 6 位）"
+            show-password
+            autocomplete="new-password"
+          />
+        </el-form-item>
+        <el-form-item label="确认新密码" prop="confirm_password">
+          <el-input
+            v-model="changePwdDialog.form.confirm_password"
+            type="password"
+            placeholder="请再次输入新密码"
+            show-password
+            autocomplete="new-password"
+            @keyup.enter="submitChangePassword"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="handleBackToLoginFromDialog">返回登录</el-button>
+        <el-button
+          type="primary"
+          :loading="changePwdDialog.loading"
+          @click="submitChangePassword"
+        >
+          确认修改
+        </el-button>
+      </template>
+    </el-dialog>
+
     <div class="footer-note">VoxAudit · 自动化通话质检</div>
   </div>
 </template>
@@ -70,6 +137,58 @@ const rules = {
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
 }
 
+// k 账号首次登录 / 密码过期 → 强制改密弹窗状态
+const changePwdFormRef = ref(null)
+const changePwdDialog = reactive({
+  visible: false,
+  loading: false,
+  title: '',
+  pendingUserInfo: null,
+  pendingTarget: '/home',
+  form: {
+    old_password: '',
+    new_password: '',
+    confirm_password: ''
+  },
+  rules: {
+    old_password: [
+      { required: true, message: '请输入旧密码', trigger: 'blur' }
+    ],
+    new_password: [
+      { required: true, message: '请输入新密码', trigger: 'blur' },
+      { min: 6, message: '新密码至少 6 位', trigger: 'blur' },
+      {
+        validator: (rule, value, cb) => {
+          if (value && value === changePwdDialog.form.old_password) {
+            return cb(new Error('新密码不能与旧密码相同'))
+          }
+          cb()
+        },
+        trigger: 'blur'
+      }
+    ],
+    confirm_password: [
+      { required: true, message: '请再次输入新密码', trigger: 'blur' },
+      {
+        validator: (rule, value, cb) => {
+          if (value !== changePwdDialog.form.new_password) {
+            return cb(new Error('两次输入的新密码不一致'))
+          }
+          cb()
+        },
+        trigger: 'blur'
+      }
+    ]
+  }
+})
+
+// 登录成功后的统一跳转（强制改密完成后也走这条）
+const navigateAfterLogin = (userInfo) => {
+  const loginid = userInfo?.loginid || ''
+  const target = loginid.startsWith('k') && loginid !== 'admin' ? '/collection-notes' : '/home'
+  router.push(target)
+}
+
 const handleLogin = async () => {
   const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
@@ -77,18 +196,85 @@ const handleLogin = async () => {
   loading.value = true
   try {
     const res = await api.auth.login(form)
-    if (res.success) {
-      localStorage.setItem('user_info', JSON.stringify(res.user_info))
-      ElMessage.success(res.message || '登录成功')
-      router.push('/home')
-    } else {
+    if (!res.success) {
       ElMessage.error(res.message || '登录失败')
+      return
     }
+
+    // 先把登录态写进去（改密接口需要 X-User-Info 头）
+    localStorage.setItem('user_info', JSON.stringify(res.user_info))
+    ElMessage.success(res.message || '登录成功')
+
+    // k 账号首次登录 / 密码过期 → 强制改密，不能直接跳转
+    if (res.must_change_password) {
+      changePwdDialog.title = '首次登录请修改密码'
+      changePwdDialog.form.old_password = form.password // 默认密码场景下回填，简化用户输入
+      changePwdDialog.form.new_password = ''
+      changePwdDialog.form.confirm_password = ''
+      changePwdDialog.pendingUserInfo = res.user_info
+      changePwdDialog.pendingTarget = (res.user_info?.loginid || '').startsWith('k')
+        && res.user_info?.loginid !== 'admin'
+        ? '/collection-notes'
+        : '/home'
+      // 下一帧再打开，避免和上面的 ElMessage 抢占焦点
+      setTimeout(() => {
+        changePwdDialog.visible = true
+      }, 0)
+      return
+    }
+
+    navigateAfterLogin(res.user_info)
   } catch (error) {
     ElMessage.error(error.message || '登录失败')
   } finally {
     loading.value = false
   }
+}
+
+const submitChangePassword = async () => {
+  const valid = await changePwdFormRef.value.validate().catch(() => false)
+  if (!valid) return
+
+  changePwdDialog.loading = true
+  try {
+    const res = await api.auth.changePassword({
+      old_password: changePwdDialog.form.old_password,
+      new_password: changePwdDialog.form.new_password
+    })
+    if (!res.success) {
+      ElMessage.error(res.message || '密码修改失败')
+      return
+    }
+    // 把后端返回的新过期时间戳写回 localStorage，免得路由守卫误判
+    if (res.password_expire_at !== undefined) {
+      const stored = JSON.parse(localStorage.getItem('user_info') || '{}')
+      stored.password_expire_at = res.password_expire_at
+      localStorage.setItem('user_info', JSON.stringify(stored))
+      changePwdDialog.pendingUserInfo = {
+        ...changePwdDialog.pendingUserInfo,
+        password_expire_at: res.password_expire_at
+      }
+    }
+    ElMessage.success('密码已修改')
+    changePwdDialog.visible = false
+    navigateAfterLogin(changePwdDialog.pendingUserInfo)
+  } catch (error) {
+    ElMessage.error(error.message || '密码修改失败')
+  } finally {
+    changePwdDialog.loading = false
+  }
+}
+
+// 改密弹窗里的「返回登录」：清掉登录态、关弹窗、重置表单
+const handleBackToLoginFromDialog = () => {
+  changePwdDialog.visible = false
+  api.auth.logout()
+  form.loginid = ''
+  form.password = ''
+  // 清掉弹窗里残留的旧/新密码
+  changePwdDialog.form.old_password = ''
+  changePwdDialog.form.new_password = ''
+  changePwdDialog.form.confirm_password = ''
 }
 </script>
 

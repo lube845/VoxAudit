@@ -58,6 +58,7 @@ request.interceptors.response.use(
 export default {
   auth: {
     login: (data) => request.post('/auth/login', data),
+    changePassword: (data) => request.post('/auth/change-password', data),
     getUserInfo: () => {
       const info = localStorage.getItem('user_info')
       return info ? JSON.parse(info) : null
@@ -166,5 +167,10 @@ export default {
     getPrompts: () => request.get('/system-settings/prompts'),
     updatePrompts: (data) => request.put('/system-settings/prompts', data),
     resetPrompts: () => request.post('/system-settings/prompts/reset'),
+  },
+
+  kUserAdmin: {
+    list: () => request.get('/admin/k-users'),
+    resetPassword: (loginid) => request.post(`/admin/k-users/${encodeURIComponent(loginid)}/reset-password`),
   }
 }

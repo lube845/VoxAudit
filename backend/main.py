@@ -13,7 +13,7 @@ from loguru import logger
 from backend.core.config import settings
 from backend.core.database import init_db
 from backend.services.oss_service import oss_service
-from backend.api import rule_router, history_router, recording_router, statistics_router, export_router, auth_router, storage_router, user_stats_router, system_settings_router
+from backend.api import rule_router, history_router, recording_router, statistics_router, export_router, auth_router, storage_router, user_stats_router, system_settings_router, k_user_admin_router
 
 
 @asynccontextmanager
@@ -111,6 +111,7 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(storage_router, prefix="/api/v1")
 app.include_router(user_stats_router, prefix="/api/v1")
 app.include_router(system_settings_router, prefix="/api/v1")
+app.include_router(k_user_admin_router, prefix="/api/v1")
 
 
 @app.get("/")

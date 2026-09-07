@@ -39,9 +39,13 @@ def verify_password(password: str, salt_hex: str, expected_hash_hex: str) -> boo
 def _k_login_state(k_user: KUser) -> tuple[bool, float | None]:
     """根据 k_user 算出 (是否需强制改密, 密码过期 unix 时间戳)。
 
-    - must_change=True 直接强制改密
-    - 已改密且超过 K_USER_PASSWORD_EXPIRE_DAYS 天 → 强制改密
-    - expire_at 始终返回，供前端做"提前提醒弹窗"
+    满足以下任一条件即视为需强制改密：
+    - must_change=True（主动强制，如管理员重置密码、首次落库）
+    - password_changed_at IS NULL（从未改密，仍在用默认密码）
+    - 距上次改密超过 K_USER_PASSWORD_EXPIRE_DAYS 天（密码过期）
+
+    expire_at 用于前端"提前提醒弹窗"；若 password_changed_at 为 NULL，
+    expire_at 返回 None（前端据此不再做"即将过期"提示）。
     """
     expire_at: float | None = None
     if k_user.password_changed_at:
@@ -49,7 +53,8 @@ def _k_login_state(k_user: KUser) -> tuple[bool, float | None]:
         expire_at = changed_ts + settings.K_USER_PASSWORD_EXPIRE_DAYS * 86400
         expired = time.time() > expire_at
     else:
-        expired = False
+        # 从未改密 → 强制改密；expire_at 留空
+        expired = True
     return bool(k_user.must_change or expired), expire_at
 
 
@@ -73,12 +78,43 @@ class ChangePasswordRequest(BaseModel):
 class ChangePasswordResponse(BaseModel):
     success: bool
     message: str
+    # 新密码的过期时间戳（unix seconds）；改密成功后回给前端，更新 localStorage
+    password_expire_at: float | None = None
 
 
 async def get_current_user(x_user_info: Optional[str] = Header(None, alias="X-User-Info")) -> dict:
     """
     从请求头获取当前用户信息
     前端登录后将用户信息JSON编码后Base64编码放入X-User-Info头
+    """
+    if not x_user_info:
+        raise HTTPException(status_code=401, detail="请先登录")
+
+    import base64
+    import json
+    try:
+        decoded = base64.b64decode(x_user_info)
+        user_info = json.loads(decoded)
+        if not user_info.get("loginid"):
+            raise HTTPException(status_code=401, detail="无效的用户信息")
+
+        # 检查会话是否过期
+        login_time = user_info.get("login_time")
+        if login_time:
+            expire_seconds = settings.SESSION_EXPIRE_HOURS * 3600
+            if time.time() - login_time > expire_seconds:
+                raise HTTPException(status_code=401, detail="登录已过期，请重新登录")
+
+        return user_info
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=401, detail="无效的用户信息")
+
+
+async def get_current_user_required(x_user_info: Optional[str] = Header(None, alias="X-User-Info")) -> dict:
+    """
+    获取当前用户信息（必须登录）
     """
     if not x_user_info:
         raise HTTPException(status_code=401, detail="请先登录")
@@ -214,9 +250,9 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
 async def change_password(
     request: ChangePasswordRequest,
     db: AsyncSession = Depends(get_db),
+    user_info: dict = Depends(get_current_user_required),
 ):
     """改密接口：仅 k 前缀账号可用，需要旧密码。"""
-    user_info = await get_current_user_required()
     loginid = user_info.get("loginid", "")
 
     if not loginid.startswith("k"):
@@ -246,4 +282,10 @@ async def change_password(
     k_user.password_changed_at = get_current_time()
     await db.commit()
 
-    return ChangePasswordResponse(success=True, message="密码已修改")
+    # 把新密码的过期时间戳回给前端，方便它更新 localStorage
+    new_expire_at = get_current_time().timestamp() + settings.K_USER_PASSWORD_EXPIRE_DAYS * 86400
+    return ChangePasswordResponse(
+        success=True,
+        message="密码已修改",
+        password_expire_at=new_expire_at,
+    )

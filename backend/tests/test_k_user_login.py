@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 k 前缀账号登录链路自检（ponytail: 留一个最小可跑验证）
 
@@ -7,6 +8,7 @@ k 前缀账号登录链路自检（ponytail: 留一个最小可跑验证）
 3. 用默认密码改密（旧密码是默认）→ 成功，must_change=false，写 password_changed_at
 4. 改密后必须用新密码登录；默认密码登录失败
 5. _k_login_state：改密 1 天前 → 仍可用；改密 100 天前 → 强制改密
+6. _k_login_state：password_changed_at IS NULL → 强制改密（即便 must_change=False）
 """
 from datetime import datetime, timedelta
 from sqlalchemy import select, delete
@@ -75,6 +77,20 @@ if __name__ == "__main__":
     mc2, _ = _k_login_state(old)
     assert mc1 is False and mc2 is True, f"过期判断错：recent={mc1} old={mc2}"
     print("✓ 改密 1 天前不强制、100 天前强制改密")
+
+    # password_changed_at IS NULL → 强制改密（即使 must_change=False 也要拦截）
+    null_change = KUser(loginid="k_null", password_hash="x", salt="00",
+                         must_change=False, password_changed_at=None)
+    mc3, expire3 = _k_login_state(null_change)
+    assert mc3 is True, f"NULL 应强制改密，实际={mc3}"
+    assert expire3 is None, f"NULL 时 expire_at 应为 None，实际={expire3}"
+
+    # password_changed_at IS NULL + must_change=True（首次落库场景）→ 强制改密
+    null_must = KUser(loginid="k_null2", password_hash="x", salt="00",
+                      must_change=True, password_changed_at=None)
+    mc4, _ = _k_login_state(null_must)
+    assert mc4 is True, f"首次落库应强制改密，实际={mc4}"
+    print("✓ password_changed_at 为 NULL 时强制改密（防绕过）")
 
     engine.dispose()
     print("\n所有自检通过。")

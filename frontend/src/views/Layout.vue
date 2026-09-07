@@ -18,19 +18,23 @@
         active-text-color="#faf8f4"
         :unique-opened="true"
       >
-        <el-menu-item index="/home">
+        <el-menu-item v-if="!isKUser" index="/home">
           <el-icon><LayoutDashboard /></el-icon>
           <template #title>数据概览</template>
         </el-menu-item>
-        <el-menu-item index="/rules">
+        <el-menu-item v-if="!isKUser" index="/rules">
           <el-icon><ListChecks /></el-icon>
           <template #title>规则管理</template>
         </el-menu-item>
-        <el-menu-item index="/recordings">
+        <el-menu-item v-if="!isKUser" index="/recordings">
           <el-icon><Mic /></el-icon>
           <template #title>录音管理</template>
         </el-menu-item>
-        <el-menu-item index="/export">
+        <el-menu-item index="/collection-notes">
+          <el-icon><NotebookText /></el-icon>
+          <template #title>催记管理</template>
+        </el-menu-item>
+        <el-menu-item v-if="!isKUser" index="/export">
           <el-icon><FileDown /></el-icon>
           <template #title>导出报告</template>
         </el-menu-item>
@@ -38,9 +42,9 @@
           <el-icon><Trash2 /></el-icon>
           <template #title>存储清理</template>
         </el-menu-item>
-        <el-menu-item v-if="isAdmin" index="/user-stats">
-          <el-icon><Users /></el-icon>
-          <template #title>用户统计</template>
+        <el-menu-item v-if="isAdmin" index="/user-management">
+          <el-icon><UserCog /></el-icon>
+          <template #title>用户管理</template>
         </el-menu-item>
         <el-menu-item v-if="isAdmin" index="/system-settings">
           <el-icon><Settings /></el-icon>
@@ -74,7 +78,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { AudioLines, LayoutDashboard, ListChecks, Mic, FileDown, Trash2, Users, Settings, LogOut } from 'lucide-vue-next'
+import { AudioLines, LayoutDashboard, ListChecks, Mic, NotebookText, FileDown, Trash2, UserCog, Settings, LogOut } from 'lucide-vue-next'
 import { now, formatDate } from '@/utils/timezone'
 import api from '@/api'
 
@@ -88,13 +92,21 @@ const userInfo = computed(() => api.auth.getUserInfo())
 
 const isAdmin = computed(() => userInfo.value?.loginid === 'admin')
 
+const isKUser = computed(() => {
+  const loginid = userInfo.value?.loginid || ''
+  return loginid.startsWith('k') && !isAdmin.value
+})
+
 const pageTitles = {
   '/home': '数据概览',
   '/rules': '规则管理',
   '/recordings': '录音管理',
+  '/collection-notes': '催记管理',
   '/export': '导出报告',
   '/storage': '存储清理',
-  '/user-stats': '用户统计',
+  '/user-management': '用户管理',
+  '/user-management/stats': '用户管理',
+  '/user-management/k-users': '用户管理',
   '/system-settings': '系统设置'
 }
 

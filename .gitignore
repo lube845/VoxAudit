@@ -159,3 +159,4 @@ backend.zip
 .claude/
 .workbuddy/
 .impeccable.md
+/docker/env.conf

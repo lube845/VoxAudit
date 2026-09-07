@@ -74,6 +74,10 @@ async def init_db():
     """
     await ensure_database_exists()
 
+    # 必须先 import 所有 model，Base.metadata 才能 create_all 出全部表
+    # 否则后续迁移脚本里裸 SQL 引用的表会不存在
+    from backend.models import k_user, recording, rule, system_settings  # noqa: F401
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
