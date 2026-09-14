@@ -171,6 +171,10 @@ export default {
 
   kUserAdmin: {
     list: () => request.get('/admin/k-users'),
+    create: (data) => request.post('/admin/k-users', data),
+    update: (loginid, data) => request.put(`/admin/k-users/${encodeURIComponent(loginid)}`, data),
     resetPassword: (loginid) => request.post(`/admin/k-users/${encodeURIComponent(loginid)}/reset-password`),
+    clearData: (loginid) => request.post(`/admin/k-users/${encodeURIComponent(loginid)}/clear-data`),
+    remove: (loginid) => request.post(`/admin/k-users/${encodeURIComponent(loginid)}/remove`),
   }
 }

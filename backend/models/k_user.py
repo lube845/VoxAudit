@@ -22,5 +22,7 @@ class KUser(Base):
     salt = Column(String(64), nullable=False, comment="PBKDF2 盐（hex）")
     must_change = Column(Boolean, default=True, nullable=False, comment="是否需强制改密（管理员主动设置或首次登录落库为 True）")
     password_changed_at = Column(DateTime, nullable=True, comment="最近一次改密时间；NULL 表示从未改密，也会触发强制改密")
+    name = Column(String(64), nullable=True, comment="姓名（白名单元数据，admin 添加时录入）")
+    department = Column(String(64), nullable=True, comment="部门（白名单元数据，admin 添加时录入）")
     created_at = Column(DateTime, default=get_current_time, comment="创建时间")
     updated_at = Column(DateTime, default=get_current_time, onupdate=get_current_time, comment="更新时间")

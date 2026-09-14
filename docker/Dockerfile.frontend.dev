@@ -1,0 +1,20 @@
+# 开发模式：跑 Vite dev server，开启 HMR 热重载
+FROM node:20-alpine
+
+WORKDIR /app
+
+# 使用国内 npm 镜像加速
+RUN npm config set registry https://registry.npmmirror.com
+
+# 先单独复制 package 文件，利用层缓存
+COPY frontend/package*.json ./
+RUN npm install
+
+# 不再 COPY 源码，源码通过 volume 挂载进来，方便热重载
+
+EXPOSE 8888
+
+# 容器内监听所有网卡；HMR 通过 wss 走 8888 端口
+ENV HOST=0.0.0.0
+
+CMD ["npm", "run", "dev"]

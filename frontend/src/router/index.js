@@ -1,6 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import api from '@/api'
 
+// k 账号（客服）可访问的页面白名单
+const K_ALLOWED_PATHS = ['/collection-notes', '/rules', '/recordings']
+
 const routes = [
   {
     path: '/login',
@@ -127,8 +130,8 @@ router.beforeEach((to, from, next) => {
   } else if (isKUser && !mustChangePassword && to.path === '/change-password') {
     // 密码已正常 → 离开改密页
     next('/collection-notes')
-  } else if (isKUser && !mustChangePassword && to.path !== '/collection-notes' && !to.path.startsWith('/collection-notes')) {
-    // k 用户访问任何非催记管理页面 → 重定向
+  } else if (isKUser && !mustChangePassword && !K_ALLOWED_PATHS.some(p => to.path === p || to.path.startsWith(p + '/'))) {
+    // k 用户访问白名单之外的页面 → 重定向到催记管理
     // （密码正常时；如果密码还要改，让上面那条接管，避免死循环）
     next('/collection-notes')
   } else if (to.meta.requiresAdmin && loginid !== 'admin') {

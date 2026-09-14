@@ -22,11 +22,11 @@
           <el-icon><LayoutDashboard /></el-icon>
           <template #title>数据概览</template>
         </el-menu-item>
-        <el-menu-item v-if="!isKUser" index="/rules">
+        <el-menu-item index="/rules">
           <el-icon><ListChecks /></el-icon>
           <template #title>规则管理</template>
         </el-menu-item>
-        <el-menu-item v-if="!isKUser" index="/recordings">
+        <el-menu-item index="/recordings">
           <el-icon><Mic /></el-icon>
           <template #title>录音管理</template>
         </el-menu-item>

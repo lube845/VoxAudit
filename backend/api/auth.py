@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel
 from typing import Optional
+from loguru import logger
 
 from backend.core.config import settings
 from backend.core.database import get_db
@@ -195,38 +196,31 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
             },
         )
 
-    # k 前缀本地账号登录
+    # k 前缀本地账号登录（白名单校验：必须由 admin 预先添加才能登录）
     if request.loginid.startswith("k"):
         result = await db.execute(select(KUser).where(KUser.loginid == request.loginid))
         k_user = result.scalar_one_or_none()
 
-        # 首次登录：用默认密码登录即落库，强制改密
         if k_user is None:
-            if request.password != settings.K_USER_DEFAULT_PASSWORD:
-                return LoginResponse(success=False, message="账号或密码错误")
-            salt_hex, hash_hex = hash_password(settings.K_USER_DEFAULT_PASSWORD)
-            k_user = KUser(
-                loginid=request.loginid,
-                password_hash=hash_hex,
-                salt=salt_hex,
-                must_change=True,
-            )
-            db.add(k_user)
-            await db.commit()
-            await db.refresh(k_user)
-        else:
-            if not verify_password(request.password, k_user.salt, k_user.password_hash):
-                return LoginResponse(success=False, message="账号或密码错误")
+            # 不在客服白名单内 → 拒绝登录；OA 路径不受此影响
+            logger.warning(f"k 账号 {request.loginid} 不在白名单，拒绝登录")
+            return LoginResponse(success=False, message="工号不在客服白名单中，请联系管理员添加")
+
+        if not verify_password(request.password, k_user.salt, k_user.password_hash):
+            return LoginResponse(success=False, message="账号或密码错误")
 
         must_change, expire_at = _k_login_state(k_user)
+        # 优先使用白名单里登记的姓名/部门，没有则回退到工号
+        display_name = k_user.name or k_user.loginid
+        display_department = k_user.department or "客服"
         return LoginResponse(
             success=True,
             message="登录成功",
             must_change_password=must_change,
             user_info={
                 "工号": k_user.loginid,
-                "姓名": k_user.loginid,
-                "部门": "客服",
+                "姓名": display_name,
+                "部门": display_department,
                 "岗位": "客服",
                 "loginid": k_user.loginid,
                 "login_time": time.time(),
