@@ -13,7 +13,8 @@ from loguru import logger
 from backend.core.config import settings
 from backend.core.database import init_db
 from backend.services.oss_service import oss_service
-from backend.api import rule_router, history_router, recording_router, statistics_router, export_router, auth_router, storage_router, user_stats_router, system_settings_router, k_user_admin_router
+from backend.middleware.audit_middleware import audit_middleware
+from backend.api import rule_router, history_router, recording_router, statistics_router, export_router, auth_router, storage_router, user_stats_router, system_settings_router, k_user_admin_router, audit_log_router, collection_note_router
 
 
 @asynccontextmanager
@@ -59,6 +60,10 @@ async def log_requests(request, call_next):
     process_time = time.time() - start_time
     logger.info(f"{request.method} {request.url.path} - {response.status_code} - {process_time:.3f}s")
     return response
+
+
+# 审计自动埋点中间件（最外层；非 GET 都会落 audit_logs）
+app.middleware("http")(audit_middleware)
 
 
 @app.exception_handler(Exception)
@@ -112,6 +117,8 @@ app.include_router(storage_router, prefix="/api/v1")
 app.include_router(user_stats_router, prefix="/api/v1")
 app.include_router(system_settings_router, prefix="/api/v1")
 app.include_router(k_user_admin_router, prefix="/api/v1")
+app.include_router(audit_log_router, prefix="/api/v1")
+app.include_router(collection_note_router, prefix="/api/v1")
 
 
 @app.get("/")

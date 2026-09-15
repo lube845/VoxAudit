@@ -186,6 +186,7 @@ import { RefreshCw, Mic, FileCheckCorner, Star, TriangleAlert } from 'lucide-vue
 import * as echarts from 'echarts'
 import { now, formatDate } from '@/utils/timezone'
 import api from '@/api'
+import { audit } from '@/utils/audit'
 
 const timeRange = ref('7')
 const agentSortBy = ref('count')
@@ -292,6 +293,7 @@ function loadAllData() {
 }
 
 function handleTimeChange() {
+  audit('home.filter', 'home', null, { time_range: timeRange.value })
   loadAllData()
 }
 

@@ -50,6 +50,10 @@
           <el-icon><Settings /></el-icon>
           <template #title>系统设置</template>
         </el-menu-item>
+        <el-menu-item v-if="isAdmin" index="/audit-logs">
+          <el-icon><ScrollText /></el-icon>
+          <template #title>审计日志</template>
+        </el-menu-item>
       </el-menu>
     </el-aside>
 
@@ -78,7 +82,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { AudioLines, LayoutDashboard, ListChecks, Mic, NotebookText, FileDown, Trash2, UserCog, Settings, LogOut } from 'lucide-vue-next'
+import { AudioLines, LayoutDashboard, ListChecks, Mic, NotebookText, FileDown, Trash2, UserCog, Settings, LogOut, ScrollText } from 'lucide-vue-next'
 import { now, formatDate } from '@/utils/timezone'
 import api from '@/api'
 
@@ -107,7 +111,8 @@ const pageTitles = {
   '/user-management': '用户管理',
   '/user-management/stats': '用户管理',
   '/user-management/k-users': '用户管理',
-  '/system-settings': '系统设置'
+  '/system-settings': '系统设置',
+  '/audit-logs': '审计日志'
 }
 
 const pageTitle = computed(() => {

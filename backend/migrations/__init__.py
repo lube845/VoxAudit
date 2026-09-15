@@ -12,6 +12,7 @@ from . import (
     migrate_add_password_changed_at,
     migrate_rule_ids_to_json,
     migrate_add_k_user_name_department,
+    migrate_add_audit_logs,
 )
 
 # 顺序：先列变更，后数据迁移
@@ -26,4 +27,5 @@ ALL_MIGRATIONS = (
     migrate_add_password_changed_at,
     migrate_rule_ids_to_json,
     migrate_add_k_user_name_department,
+    migrate_add_audit_logs,
 )

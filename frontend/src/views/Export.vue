@@ -115,6 +115,7 @@ import { Download, FileText, User, Check } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
 import { now } from '@/utils/timezone'
 import api from '@/api'
+import { audit } from '@/utils/audit'
 
 const exportType = ref('all')
 const selectedAgent = ref('')
@@ -183,6 +184,13 @@ async function handleExport() {
 
   exporting.value = true
   try {
+    // 前端审计埋点（GET 接口中间件已记为 export.report，这里补 detail）
+    audit('export.report', 'export', null, {
+      type: exportType.value,
+      agent_name: exportType.value === 'agent' ? selectedAgent.value : undefined,
+      date_range: dateRange.value || undefined,
+    })
+
     const params = { type: exportType.value }
     if (exportType.value === 'agent') {
       params.agent_name = selectedAgent.value

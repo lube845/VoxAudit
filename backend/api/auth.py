@@ -4,7 +4,7 @@
 import time
 import secrets
 import hashlib
-from fastapi import APIRouter, HTTPException, Header, Depends
+from fastapi import APIRouter, HTTPException, Header, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel
@@ -16,6 +16,7 @@ from backend.core.database import get_db
 from backend.models.k_user import KUser
 from backend.core.datetime_utils import get_current_time
 from backend.oa_auth import oa_login_with_password
+from backend.services.audit_service import record_action
 
 router = APIRouter(prefix="/auth", tags=["认证"])
 
@@ -172,7 +173,11 @@ async def get_current_user_required(x_user_info: Optional[str] = Header(None, al
 
 
 @router.post("/login", response_model=LoginResponse)
-async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
+async def login(
+    request: LoginRequest,
+    http_request: Request,
+    db: AsyncSession = Depends(get_db),
+):
     """
     登录接口
     - 超级管理员：直接验证密码
@@ -182,7 +187,23 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
     # 超级管理员登录
     if request.loginid == settings.ADMIN_USER:
         if request.password != settings.ADMIN_PASSWORD:
+            await record_action(
+                actor={"loginid": request.loginid, "姓名": "超级管理员"},
+                action="auth.login_fail",
+                target_type="auth",
+                target_id=request.loginid,
+                request=http_request,
+                result="fail",
+                detail={"reason": "wrong_password"},
+            )
             return LoginResponse(success=False, message="密码错误")
+        await record_action(
+            actor={"loginid": "admin", "姓名": "超级管理员"},
+            action="auth.login",
+            target_type="auth",
+            target_id="admin",
+            request=http_request,
+        )
         return LoginResponse(
             success=True,
             message="登录成功",
@@ -204,38 +225,82 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
         if k_user is None:
             # 不在客服白名单内 → 拒绝登录；OA 路径不受此影响
             logger.warning(f"k 账号 {request.loginid} 不在白名单，拒绝登录")
+            await record_action(
+                actor={"loginid": request.loginid},
+                action="auth.login_fail",
+                target_type="auth",
+                target_id=request.loginid,
+                request=http_request,
+                result="fail",
+                detail={"reason": "not_in_whitelist"},
+            )
             return LoginResponse(success=False, message="工号不在客服白名单中，请联系管理员添加")
 
         if not verify_password(request.password, k_user.salt, k_user.password_hash):
+            await record_action(
+                actor={"loginid": request.loginid, "姓名": k_user.name},
+                action="auth.login_fail",
+                target_type="auth",
+                target_id=request.loginid,
+                request=http_request,
+                result="fail",
+                detail={"reason": "wrong_password"},
+            )
             return LoginResponse(success=False, message="账号或密码错误")
 
         must_change, expire_at = _k_login_state(k_user)
         # 优先使用白名单里登记的姓名/部门，没有则回退到工号
         display_name = k_user.name or k_user.loginid
         display_department = k_user.department or "客服"
+        user_info = {
+            "工号": k_user.loginid,
+            "姓名": display_name,
+            "部门": display_department,
+            "岗位": "客服",
+            "loginid": k_user.loginid,
+            "login_time": time.time(),
+            "password_expire_at": expire_at,
+        }
+        await record_action(
+            actor=user_info,
+            action="auth.login",
+            target_type="auth",
+            target_id=k_user.loginid,
+            request=http_request,
+            detail={"must_change_password": must_change},
+        )
         return LoginResponse(
             success=True,
             message="登录成功",
             must_change_password=must_change,
-            user_info={
-                "工号": k_user.loginid,
-                "姓名": display_name,
-                "部门": display_department,
-                "岗位": "客服",
-                "loginid": k_user.loginid,
-                "login_time": time.time(),
-                "password_expire_at": expire_at,
-            },
+            user_info=user_info,
         )
 
     # 普通用户OA登录
     success, user_info, message = oa_login_with_password(request.loginid, request.password)
 
     if not success:
+        await record_action(
+            actor={"loginid": request.loginid},
+            action="auth.login_fail",
+            target_type="auth",
+            target_id=request.loginid,
+            request=http_request,
+            result="fail",
+            detail={"reason": "oa_login_failed", "oa_message": message},
+        )
         return LoginResponse(success=False, message=message)
 
     # 添加登录时间戳
     user_info["login_time"] = time.time()
+
+    await record_action(
+        actor=user_info,
+        action="auth.login",
+        target_type="auth",
+        target_id=user_info.get("loginid") or request.loginid,
+        request=http_request,
+    )
 
     return LoginResponse(success=True, message=message, user_info=user_info)
 
@@ -243,6 +308,7 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
 @router.post("/change-password", response_model=ChangePasswordResponse)
 async def change_password(
     request: ChangePasswordRequest,
+    http_request: Request,
     db: AsyncSession = Depends(get_db),
     user_info: dict = Depends(get_current_user_required),
 ):
@@ -264,9 +330,27 @@ async def change_password(
     else:
         old_ok = verify_password(request.old_password, k_user.salt, k_user.password_hash)
     if not old_ok:
+        await record_action(
+            actor=user_info,
+            action="auth.change_password",
+            target_type="auth",
+            target_id=loginid,
+            request=http_request,
+            result="fail",
+            detail={"reason": "wrong_old_password"},
+        )
         return ChangePasswordResponse(success=False, message="旧密码错误")
 
     if not request.new_password or len(request.new_password) < 6:
+        await record_action(
+            actor=user_info,
+            action="auth.change_password",
+            target_type="auth",
+            target_id=loginid,
+            request=http_request,
+            result="fail",
+            detail={"reason": "new_password_too_short"},
+        )
         return ChangePasswordResponse(success=False, message="新密码长度至少 6 位")
 
     salt_hex, hash_hex = hash_password(request.new_password)
@@ -275,6 +359,14 @@ async def change_password(
     k_user.must_change = False
     k_user.password_changed_at = get_current_time()
     await db.commit()
+
+    await record_action(
+        actor=user_info,
+        action="auth.change_password",
+        target_type="auth",
+        target_id=loginid,
+        request=http_request,
+    )
 
     # 把新密码的过期时间戳回给前端，方便它更新 localStorage
     new_expire_at = get_current_time().timestamp() + settings.K_USER_PASSWORD_EXPIRE_DAYS * 86400

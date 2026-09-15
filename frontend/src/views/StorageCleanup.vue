@@ -126,10 +126,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { RefreshCw } from 'lucide-vue-next'
 import api from '@/api'
+import { audit } from '@/utils/audit'
 
 const loading = ref(false)
 const loadingObjects = ref(false)
@@ -137,6 +138,10 @@ const loadingCache = ref(false)
 const deleting = ref(false)
 const clearingCache = ref(false)
 const activeTab = ref('recordings')
+
+watch(activeTab, (val, oldVal) => {
+  if (oldVal) audit('storage.switch_tab', 'storage', val, { from: oldVal })
+})
 
 const storageInfo = ref({
   total_size: 0,

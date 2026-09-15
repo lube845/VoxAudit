@@ -344,6 +344,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Download, Upload, WandSparkles, ArrowRight, LoaderCircle, Maximize2, Star, TrendingDown } from 'lucide-vue-next'
 import { formatDate, getTimezone } from '@/utils/timezone'
 import api from '@/api'
+import { audit } from '@/utils/audit'
 
 const loading = ref(false)
 const list = ref([])
@@ -453,6 +454,7 @@ function handleDeductionSizeChange() {
 
 async function exportRules() {
   try {
+    audit('rule.export', 'rule', null, { total: undefined })
     const data = await api.rule.export()
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url = window.URL.createObjectURL(blob)
@@ -513,6 +515,7 @@ async function importRules() {
   }
   importing.value = true
   try {
+    audit('rule.import', 'rule', null, { count: importFileData.value?.rules?.length })
     const result = await api.rule.import(importFileData.value)
     if (result.errors && result.errors.length > 0) {
       ElMessage.warning(`导入完成，但有 ${result.errors.length} 条错误`)

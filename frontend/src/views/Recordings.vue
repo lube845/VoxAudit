@@ -282,6 +282,7 @@ import { Search, Upload, RotateCw } from 'lucide-vue-next'
 import { formatDate, now } from '@/utils/timezone'
 import CryptoJS from 'crypto-js'
 import api from '@/api'
+import { audit } from '@/utils/audit'
 
 const router = useRouter()
 
@@ -387,6 +388,11 @@ async function handleRefresh() {
 
 // 搜索相关
 function handleQuery() {
+  audit('recordings.search', 'recording', null, {
+    keyword: queryParams.keyword || undefined,
+    status: queryParams.status || undefined,
+    score_dimension: queryParams.score_dimension || undefined,
+  })
   queryParams.page = 1
   loadData()
 }

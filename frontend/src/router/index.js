@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import api from '@/api'
+import { audit } from '@/utils/audit'
 
 // k 账号（客服）可访问的页面白名单
 const K_ALLOWED_PATHS = ['/collection-notes', '/rules', '/recordings']
@@ -89,6 +90,12 @@ const routes = [
         name: 'SystemSettings',
         component: () => import('@/views/SystemSettings.vue'),
         meta: { requiresAdmin: true }
+      },
+      {
+        path: '/audit-logs',
+        name: 'AuditLogs',
+        component: () => import('@/views/AuditLogs.vue'),
+        meta: { requiresAdmin: true }
       }
     ]
   }
@@ -142,3 +149,36 @@ router.beforeEach((to, from, next) => {
 })
 
 export default router
+
+// ——— 路由守卫：每次路由切换记录 page.view ———
+router.afterEach((to, from) => {
+  // 不记登录页（避免刷一堆 page.view 噪音）
+  if (to.path === '/login') return
+
+  const userInfo = api.auth.getUserInfo()
+  if (!userInfo) return  // 未登录不记
+
+  // 从路由路径推断 target_type
+  // 例：/rules → "rule"，/user-management/k-users → "k_user"，/recordings/123 → "recording_detail"
+  const segments = to.path.split('/').filter(Boolean)
+  if (!segments.length) return
+
+  const seg0 = segments[0]
+  const seg1 = segments[1]
+  let targetType = seg0
+  if (seg0 === 'recordings' && segments.length > 1) {
+    targetType = 'recording_detail'
+  } else if (seg0 === 'user-management' && seg1 === 'k-users') {
+    targetType = 'k_user'
+  } else if (seg0 === 'user-management' && seg1 === 'stats') {
+    targetType = 'user_stats'
+  } else if (seg0 === 'collection-notes') {
+    targetType = 'collection_note'
+  }
+  // target_id 用完整路由路径（含 query）
+  const targetId = to.fullPath
+
+  audit('page.view', targetType, targetId, {
+    from: from.fullPath || '',
+  })
+})

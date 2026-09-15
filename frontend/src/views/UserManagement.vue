@@ -17,6 +17,7 @@
 <script setup>
 import { ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { audit } from '@/utils/audit'
 
 const route = useRoute()
 const router = useRouter()
@@ -34,11 +35,13 @@ function syncFromRoute() {
 
 // activeTab 变化（点击 tab）→ 同步推路由；路由变化 → 同步 activeTab
 // 双 watch 互相同步，彻底脱离 element-plus 事件回调的细节差异
-watch(activeTab, (val) => {
+watch(activeTab, (val, oldVal) => {
   const target = val === 'k-users'
     ? '/user-management/k-users'
     : '/user-management/stats'
   if (route.path !== target) {
+    // 显式埋点：Tab 切换（区别于普通 page.view）
+    audit('user_management.switch_tab', 'user_management', val, { from: oldVal })
     router.push(target)
   }
 })

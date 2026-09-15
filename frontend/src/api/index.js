@@ -176,5 +176,26 @@ export default {
     resetPassword: (loginid) => request.post(`/admin/k-users/${encodeURIComponent(loginid)}/reset-password`),
     clearData: (loginid) => request.post(`/admin/k-users/${encodeURIComponent(loginid)}/clear-data`),
     remove: (loginid) => request.post(`/admin/k-users/${encodeURIComponent(loginid)}/remove`),
+  },
+
+  // 审计日志（admin 查询；record 给前端埋点用）
+  auditLog: {
+    list:        (params) => request.get('/admin/audit-logs', { params }),
+    actions:     () => request.get('/admin/audit-logs/actions'),
+    actors:      () => request.get('/admin/audit-logs/actors'),
+    export:      (params) => request.get('/admin/audit-logs/export', { params, responseType: 'blob' }),
+    record:      (data) => request.post('/admin/audit-logs/record', data),
+  },
+
+  // 催记管理
+  collectionNotes: {
+    listCalls:        (params) => request.get('/collection-notes/calls', { params }),
+    getCall:          (callId) => request.get(`/collection-notes/calls/${encodeURIComponent(callId)}`),
+    viewStructured:   (callId) => request.post(`/collection-notes/calls/${encodeURIComponent(callId)}/view-structured`),
+    viewUnstructured: (callId) => request.post(`/collection-notes/calls/${encodeURIComponent(callId)}/view-unstructured`),
+    editStructured:   (callId, data) => request.post(`/collection-notes/calls/${encodeURIComponent(callId)}/edit-structured`, data),
+    editUnstructured: (callId, data) => request.post(`/collection-notes/calls/${encodeURIComponent(callId)}/edit-unstructured`, data),
+    saveStructured:   (callId, data) => request.post(`/collection-notes/calls/${encodeURIComponent(callId)}/save-structured`, data),
+    saveUnstructured: (callId, data) => request.post(`/collection-notes/calls/${encodeURIComponent(callId)}/save-unstructured`, data),
   }
 }
