@@ -93,50 +93,102 @@
         <!-- 评分明细 -->
         <el-card style="margin-top: 20px" v-if="scoringResult">
           <template #header>
-            <span>评分明细</span>
+            <div class="card-header">
+              <span>评分明细</span>
+              <el-radio-group v-model="detailFilter" size="small">
+                <el-radio-button value="all">全部</el-radio-button>
+                <el-radio-button value="matched">仅命中</el-radio-button>
+                <el-radio-button value="not_matched">仅未命中</el-radio-button>
+              </el-radio-group>
+            </div>
           </template>
 
           <!-- 加分项目 -->
-          <div v-if="bonusItems.length > 0" style="margin-bottom: 16px">
-            <div style="font-weight: bold; margin-bottom: 8px">加分项目</div>
-            <el-table :data="bonusItems" stripe size="small">
-              <el-table-column prop="item_name" label="考核项" />
-              <el-table-column prop="score" label="得分" width="80">
+          <div v-if="filteredBonusItems.length > 0" style="margin-bottom: 16px">
+            <div style="font-weight: bold; margin-bottom: 8px">
+              加分项目（命中 {{ matchedBonusCount }} / 共 {{ bonusItems.length }} 条）
+            </div>
+            <el-table :data="filteredBonusItems" stripe size="small" border>
+              <el-table-column prop="item_name" label="考核项" min-width="140" />
+              <el-table-column label="命中状态" width="90">
                 <template #default="{ row }">
-                  <span style="color: #3d7a4f">{{ row.score || 0 }}</span>
+                  <el-tag v-if="row.status === 'matched'" type="success" size="small">已命中</el-tag>
+                  <el-tag v-else type="info" size="small">未命中</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="is_veto" label="是否否决项" width="100">
+              <el-table-column label="得分" width="80">
+                <template #default="{ row }">
+                  <span :style="{ color: row.status === 'matched' ? '#3d7a4f' : 'var(--va-muted)', fontWeight: row.status === 'matched' ? 'bold' : 'normal' }">
+                    {{ row.score || 0 }}
+                  </span>
+                </template>
+              </el-table-column>
+              <el-table-column label="是否否决" width="80">
                 <template #default="{ row }">
                   <el-tag v-if="row.is_veto" type="danger" size="small">是</el-tag>
                   <span v-else style="color: var(--va-muted)">否</span>
                 </template>
               </el-table-column>
-              <el-table-column prop="matched_text" label="匹配文本" show-overflow-tooltip />
+              <el-table-column label="匹配文本" min-width="180" show-overflow-tooltip>
+                <template #default="{ row }">
+                  <span v-if="row.matched_text">{{ row.matched_text }}</span>
+                  <span v-else style="color: var(--va-muted)">-</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="命中/未命中原因" min-width="220" show-overflow-tooltip>
+                <template #default="{ row }">
+                  <span v-if="row.reason">{{ row.reason }}</span>
+                  <span v-else style="color: var(--va-muted)">-</span>
+                </template>
+              </el-table-column>
             </el-table>
           </div>
 
           <!-- 减分项目 -->
-          <div v-if="deductionItems.length > 0">
-            <div style="font-weight: bold; margin-bottom: 8px">减分项目</div>
-            <el-table :data="deductionItems" stripe size="small">
-              <el-table-column prop="item_name" label="考核项" />
-              <el-table-column prop="score" label="扣分" width="80">
+          <div v-if="filteredDeductionItems.length > 0">
+            <div style="font-weight: bold; margin-bottom: 8px">
+              减分项目（命中 {{ matchedDeductionCount }} / 共 {{ deductionItems.length }} 条）
+            </div>
+            <el-table :data="filteredDeductionItems" stripe size="small" border>
+              <el-table-column prop="item_name" label="考核项" min-width="140" />
+              <el-table-column label="命中状态" width="90">
                 <template #default="{ row }">
-                  <span style="color: #b03424">{{ Math.abs(row.score) }}</span>
+                  <el-tag v-if="row.status === 'matched'" type="danger" size="small">已命中</el-tag>
+                  <el-tag v-else type="info" size="small">未命中</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="is_veto" label="是否否决项" width="100">
+              <el-table-column label="扣分" width="80">
+                <template #default="{ row }">
+                  <span :style="{ color: row.status === 'matched' ? '#b03424' : 'var(--va-muted)', fontWeight: row.status === 'matched' ? 'bold' : 'normal' }">
+                    {{ Math.abs(row.score) }}
+                  </span>
+                </template>
+              </el-table-column>
+              <el-table-column label="是否否决" width="80">
                 <template #default="{ row }">
                   <el-tag v-if="row.is_veto" type="danger" size="small">是</el-tag>
                   <span v-else style="color: var(--va-muted)">否</span>
                 </template>
               </el-table-column>
-              <el-table-column prop="matched_text" label="匹配文本" show-overflow-tooltip />
+              <el-table-column label="匹配文本" min-width="180" show-overflow-tooltip>
+                <template #default="{ row }">
+                  <span v-if="row.matched_text">{{ row.matched_text }}</span>
+                  <span v-else style="color: var(--va-muted)">-</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="命中/未命中原因" min-width="220" show-overflow-tooltip>
+                <template #default="{ row }">
+                  <span v-if="row.reason">{{ row.reason }}</span>
+                  <span v-else style="color: var(--va-muted)">-</span>
+                </template>
+              </el-table-column>
             </el-table>
           </div>
 
-          <el-empty v-if="bonusItems.length === 0 && deductionItems.length === 0" description="暂无命中的规则" />
+          <el-empty
+            v-if="bonusItems.length === 0 && deductionItems.length === 0"
+            description="暂无评分规则"
+          />
         </el-card>
       </el-col>
     </el-row>
@@ -156,6 +208,7 @@ const router = useRouter()
 
 const recording = ref(null)
 const scoringResult = ref(null)
+const detailFilter = ref('all')
 
 const transcriptSegments = computed(() => {
   if (!recording.value?.transcript_segments) return []
@@ -165,16 +218,42 @@ const transcriptSegments = computed(() => {
 const bonusItems = computed(() => {
   if (!scoringResult.value?.details) return []
   return scoringResult.value.details
-    .filter(d => d.item_type === 'bonus' && d.status === 'matched')
-    .sort((a, b) => b.score - a.score)
+    .filter(d => d.item_type === 'bonus')
+    .sort((a, b) => {
+      // 已命中的排在前面，未命中的排在后面
+      if (a.status === 'matched' && b.status !== 'matched') return -1
+      if (a.status !== 'matched' && b.status === 'matched') return 1
+      return b.score - a.score
+    })
 })
 
 const deductionItems = computed(() => {
   if (!scoringResult.value?.details) return []
   return scoringResult.value.details
-    .filter(d => d.item_type === 'deduction' && d.status === 'matched')
-    .sort((a, b) => Math.abs(b.score) - Math.abs(a.score))
+    .filter(d => d.item_type === 'deduction')
+    .sort((a, b) => {
+      if (a.status === 'matched' && b.status !== 'matched') return -1
+      if (a.status !== 'matched' && b.status === 'matched') return 1
+      return Math.abs(b.score) - Math.abs(a.score)
+    })
 })
+
+const filteredBonusItems = computed(() => {
+  if (detailFilter.value === 'all') return bonusItems.value
+  return bonusItems.value.filter(d => d.status === detailFilter.value)
+})
+
+const filteredDeductionItems = computed(() => {
+  if (detailFilter.value === 'all') return deductionItems.value
+  return deductionItems.value.filter(d => d.status === detailFilter.value)
+})
+
+const matchedBonusCount = computed(() =>
+  bonusItems.value.filter(d => d.status === 'matched').length
+)
+const matchedDeductionCount = computed(() =>
+  deductionItems.value.filter(d => d.status === 'matched').length
+)
 
 function goBack() {
   router.back()

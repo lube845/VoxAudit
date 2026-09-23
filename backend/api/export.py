@@ -251,9 +251,9 @@ async def export_single_recording_report(
     # 评分明细
     if scoring and scoring.scoring_details:
         doc.add_heading('评分明细', level=2)
-        detail_table = doc.add_table(rows=1, cols=5)
+        detail_table = doc.add_table(rows=1, cols=6)
         detail_table.style = 'Table Grid'
-        headers = ['考核项', '类型', '状态', '得分', '匹配文本']
+        headers = ['考核项', '类型', '状态', '得分', '匹配文本', '命中/未命中原因']
         header_row = detail_table.rows[0]
         for i, header in enumerate(headers):
             cell = header_row.cells[i]
@@ -265,14 +265,14 @@ async def export_single_recording_report(
             item_type = d.get('item_type', 'bonus')
             status = d.get('status', 'not_matched')
             score = d.get('score', 0)
-            max_score = d.get('max_score', 0)
 
             style_cell(row.cells[0], d.get('item_name', '-'))
             style_cell(row.cells[1], '加分' if item_type == 'bonus' else '扣分')
             status_map = {'matched': '已匹配', 'not_matched': '未匹配'}
             style_cell(row.cells[2], status_map.get(status, status))
-            style_cell(row.cells[3], f"{score}/{max_score}")
-            style_cell(row.cells[4], d.get('matched_text', '-'))
+            style_cell(row.cells[3], str(score))
+            style_cell(row.cells[4], d.get('matched_text', '-') or '-')
+            style_cell(row.cells[5], d.get('reason', '-') or '-')
 
     # 转写文本
     if recording.transcript or recording.transcript_segments:

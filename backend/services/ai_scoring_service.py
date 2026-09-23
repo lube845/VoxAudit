@@ -228,9 +228,11 @@ class AIScoringService:
                 if item_result and item_result.get("status") == "matched":
                     score = item["max_score"]
                     matched_text = item_result.get("matched_text", "")
+                    reason = item_result.get("reason", "")
                 else:
                     score = 0
                     matched_text = ""
+                    reason = item_result.get("reason", "") if item_result else ""
 
                 total_score += score
                 details.append({
@@ -241,6 +243,7 @@ class AIScoringService:
                     "score": score,
                     "max_score": item["max_score"],
                     "matched_text": matched_text,
+                    "reason": reason,
                     "is_veto": item.get("is_veto", False),
                 })
 
@@ -292,6 +295,7 @@ class AIScoringService:
                     "score": -deduction,
                     "max_score": item["max_score"],
                     "matched_text": item_result.get("matched_text", "") if item_result else "",
+                    "reason": item_result.get("reason", "") if item_result else "",
                     "is_veto": item.get("is_veto", False),
                 })
 

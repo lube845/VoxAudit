@@ -612,6 +612,7 @@ async def get_recording(
                     "score": d.get("score", 0),
                     "max_score": d.get("max_score", 0),
                     "matched_text": d.get("matched_text"),
+                    "reason": d.get("reason", ""),
                     "is_veto": d.get("is_veto", False),
                 })
 
