@@ -160,3 +160,4 @@ backend.zip
 .workbuddy/
 .impeccable.md
 /docker/env.conf
+/backend/scripts/

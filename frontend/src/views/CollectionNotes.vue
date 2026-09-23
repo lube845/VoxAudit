@@ -30,35 +30,63 @@
 
     <!-- 筛选区 -->
     <el-card class="filter-card" shadow="never">
-      <el-form :inline="true" class="filter-form">
-        <el-form-item label="座席工号">
-          <el-input v-model="filters.agentId" placeholder="请输入工号" clearable style="width: 180px" />
-        </el-form-item>
-        <el-form-item label="座席名称">
-          <el-input v-model="filters.agentName" placeholder="请输入姓名" clearable style="width: 180px" />
-        </el-form-item>
-        <el-form-item label="分机号">
-          <el-input v-model="filters.extension" placeholder="请输入分机号" clearable style="width: 180px" />
-        </el-form-item>
-        <el-form-item label="呼叫号码">
-          <el-input v-model="filters.phone" placeholder="请输入手机号" clearable style="width: 180px" />
-        </el-form-item>
-        <el-form-item label="开始时间">
-          <el-date-picker v-model="filters.startTime" type="datetime" placeholder="年/月/日 --:--"
-            format="YYYY-MM-DD HH:mm:ss" value-format="YYYY-MM-DD HH:mm:ss" style="width: 200px" />
-        </el-form-item>
-        <el-form-item label="结束时间">
-          <el-date-picker v-model="filters.endTime" type="datetime" placeholder="年/月/日 --:--"
-            format="YYYY-MM-DD HH:mm:ss" value-format="YYYY-MM-DD HH:mm:ss" style="width: 200px" />
-        </el-form-item>
-        <el-form-item class="filter-actions">
-          <el-button :loading="refreshing" @click="handleRefresh">
-            <el-icon><Refresh /></el-icon>刷新
+      <div class="search-bar">
+        <div class="filter-row">
+          <el-input
+            v-model="filters.agentId"
+            placeholder="座席工号"
+            clearable
+            style="width: 140px"
+            @input="handleAutoQuery"
+          >
+            <template #prefix><el-icon><User /></el-icon></template>
+          </el-input>
+          <el-input
+            v-model="filters.agentName"
+            placeholder="座席姓名"
+            clearable
+            style="width: 140px"
+            @input="handleAutoQuery"
+          >
+            <template #prefix><el-icon><User /></el-icon></template>
+          </el-input>
+          <el-input
+            v-model="filters.extension"
+            placeholder="分机号"
+            clearable
+            style="width: 140px"
+            @input="handleAutoQuery"
+          >
+            <template #prefix><el-icon><Hash /></el-icon></template>
+          </el-input>
+          <el-input
+            v-model="filters.phone"
+            placeholder="呼叫号码"
+            clearable
+            style="width: 140px"
+            @input="handleAutoQuery"
+          >
+            <template #prefix><el-icon><Phone /></el-icon></template>
+          </el-input>
+          <el-date-picker
+            v-model="filters.dateRange"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            :shortcuts="dateRangeShortcuts"
+            style="width: 280px"
+            @change="handleAutoQuery"
+          />
+          <div class="filter-spacer" />
+          <el-button @click="handleReset">
+            <el-icon><RotateCcw /></el-icon>重置
           </el-button>
-          <el-button @click="handleReset">重置</el-button>
-          <el-button type="primary" @click="handleQuery">查询</el-button>
-        </el-form-item>
-      </el-form>
+          <span class="total-count">共 {{ filteredList.length }} 条</span>
+        </div>
+      </div>
     </el-card>
 
     <!-- 通话列表 -->
@@ -152,8 +180,9 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { Refresh } from '@element-plus/icons-vue'
+import { User, Hash, Phone, RotateCcw } from 'lucide-vue-next'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { now } from '@/utils/timezone'
 import api from '@/api'
 
 // ——— 数据 ———
@@ -173,9 +202,44 @@ const filters = ref({
   agentName: '',
   extension: '',
   phone: '',
-  startTime: '',
-  endTime: '',
+  dateRange: [],
 })
+
+// 时间范围快捷选项 (与导出报告页保持一致)
+const dateRangeShortcuts = [
+  {
+    text: '近一周',
+    value: () => {
+      const end = now().toDate()
+      const start = now().subtract(6, 'day').toDate()
+      return [start, end]
+    },
+  },
+  {
+    text: '近一月',
+    value: () => {
+      const end = now().toDate()
+      const start = now().subtract(29, 'day').toDate()
+      return [start, end]
+    },
+  },
+  {
+    text: '近半年',
+    value: () => {
+      const end = now().toDate()
+      const start = now().subtract(179, 'day').toDate()
+      return [start, end]
+    },
+  },
+  {
+    text: '近一年',
+    value: () => {
+      const end = now().toDate()
+      const start = now().subtract(364, 'day').toDate()
+      return [start, end]
+    },
+  },
+]
 
 const page = ref(1)
 const pageSize = ref(10)
@@ -190,12 +254,13 @@ function formatDuration(sec) {
 
 const filteredList = computed(() => {
   return allList.value.filter((item) => {
-    if (filters.value.agentId && !String(item.agentId).toLowerCase().includes(filters.value.agentId.toLowerCase())) return false
-    if (filters.value.agentName && !(item.agentName || '').includes(filters.value.agentName)) return false
-    if (filters.value.extension && !String(item.extension).includes(filters.value.extension)) return false
-    if (filters.value.phone && !String(item.phone).includes(filters.value.phone)) return false
-    if (filters.value.startTime && item.startTime < filters.value.startTime) return false
-    if (filters.value.endTime && item.endTime > filters.value.endTime) return false
+    if (filters.value.agentId && !String(item.agentId || '').toLowerCase().includes(filters.value.agentId.toLowerCase())) return false
+    if (filters.value.agentName && !String(item.agentName || '').toLowerCase().includes(filters.value.agentName.toLowerCase())) return false
+    if (filters.value.extension && !String(item.extension || '').toLowerCase().includes(filters.value.extension.toLowerCase())) return false
+    if (filters.value.phone && !String(item.phone || '').toLowerCase().includes(filters.value.phone.toLowerCase())) return false
+    const [tStart, tEnd] = filters.value.dateRange || []
+    if (tStart && item.startTime < tStart) return false
+    if (tEnd && item.endTime > tEnd) return false
     return true
   })
 })
@@ -226,8 +291,8 @@ async function fetchList() {
       agent_name: filters.value.agentName || undefined,
       extension: filters.value.extension || undefined,
       phone: filters.value.phone || undefined,
-      start_time: filters.value.startTime || undefined,
-      end_time: filters.value.endTime || undefined,
+      start_time: filters.value.dateRange?.[0] || undefined,
+      end_time: filters.value.dateRange?.[1] || undefined,
     })
     const items = (res.items || []).map((c) => ({
       callId: c.call_id,
@@ -252,12 +317,24 @@ function handleQuery() {
   page.value = 1
 }
 
+// 自动查询: 任意筛选条件变化时触发, 200ms 防抖避免频繁请求
+let autoQueryTimer = null
+function handleAutoQuery() {
+  if (autoQueryTimer) clearTimeout(autoQueryTimer)
+  autoQueryTimer = setTimeout(async () => {
+    page.value = 1
+    await fetchList()
+  }, 200)
+}
+
 function handleReset() {
   filters.value = {
     agentId: '', agentName: '', extension: '',
-    phone: '', startTime: '', endTime: '',
+    phone: '', dateRange: [],
   }
   page.value = 1
+  // 重置后立即重新拉一次, 不依赖防抖
+  fetchList()
 }
 
 async function handleRefresh() {
@@ -387,11 +464,27 @@ onMounted(fetchList)
 }
 .filter-card, .table-card { border: 1px solid var(--va-hairline); border-radius: var(--va-radius-md); }
 .filter-card :deep(.el-card__body), .table-card :deep(.el-card__body) { padding: 18px 22px; }
-.filter-form { display: flex; flex-wrap: wrap; align-items: center; row-gap: 4px; }
-.filter-form :deep(.el-form-item) { margin-right: 18px; margin-bottom: 12px; }
-.filter-form :deep(.el-form-item__label) { color: var(--va-ink-soft); font-size: 13px; }
-.filter-actions { margin-left: auto; margin-right: 0; }
-.filter-actions :deep(.el-form-item__content) { display: flex; gap: 10px; }
+.search-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.filter-row :deep(.el-input__wrapper), .filter-row :deep(.el-date-editor) {
+  font-size: 14px;
+}
+.filter-spacer { flex: 1; min-width: 12px; }
+.total-count {
+  margin-left: 4px;
+  color: var(--va-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
 .calls-table { width: 100%; }
 .calls-table :deep(th.el-table__cell) { background: var(--va-paper-deep); color: var(--va-ink-soft); font-weight: 600; font-size: 13px; }
 .pagination { margin-top: 18px; display: flex; justify-content: flex-end; }

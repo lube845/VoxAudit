@@ -93,11 +93,11 @@ async def list_calls(
     """通话列表（占位）"""
     items = []
     for c in _MOCK_CALLS:
-        if agent_id and c["agent_id"] != agent_id:
+        if agent_id and agent_id not in (c["agent_id"] or ""):
             continue
         if agent_name and agent_name not in (c["agent_name"] or ""):
             continue
-        if extension and c["extension"] != extension:
+        if extension and extension not in (c["extension"] or ""):
             continue
         if phone and phone not in c["phone"]:
             continue
