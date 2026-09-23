@@ -1,3 +1,25 @@
+# 阶段1: 编译 (需要 gcc 编译部分 Python C 扩展)
+FROM python:3.11-slim AS builder
+
+# 使用清华镜像源加速 apt
+RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources \
+    && sed -i 's/security.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.list.d/debian.sources
+
+WORKDIR /workspace
+
+# 只安装编译期需要的包, --no-install-recommends 避免拉入冗余依赖
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc libmariadb-dev && rm -rf /var/lib/apt/lists/*
+
+# 先 copy requirements 利用 Docker 缓存
+COPY backend/requirements.txt .
+
+# 安装到 /install 目录, 稍后整体拷贝到运行时镜像
+RUN pip install --no-cache-dir --default-timeout=100 --prefix=/install \
+    -r requirements.txt \
+    -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com
+
+# 阶段2: 运行时 (精简, 只保留运行需要的系统包)
 FROM python:3.11-slim
 
 # 使用清华镜像源加速 apt
@@ -6,15 +28,21 @@ RUN sed -i 's/deb.debian.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apt/sources.li
 
 WORKDIR /workspace
 
-RUN apt-get update && apt-get install -y \
-    gcc libmariadb-dev curl ffmpeg && rm -rf /var/lib/apt/lists/*
+# 只安装运行时真正需要的包, --no-install-recommends 避免拉入 ffmpeg 的 GUI/语音识别等冗余推荐依赖
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ffmpeg && rm -rf /var/lib/apt/lists/*
 
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir --default-timeout=100 -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com
+# 从编译阶段拷贝已安装的 Python 包
+COPY --from=builder /install /usr/local
+
+# 把所有后端代码打进镜像 (不再依赖外部挂载)
+COPY backend/ ./backend/
 
 RUN mkdir -p /workspace/logs
 
 EXPOSE 8000
 
 ENV PYTHONPATH=/workspace
-CMD ["python", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+# 代码已在镜像内, 不再使用 --reload
+CMD ["python", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
