@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     """应用配置"""
 
     APP_NAME: str = "VoxAudit 语音管理系统"
-    APP_VERSION: str = "1.0.1"
+    APP_VERSION: str = "1.3.0"
     DEBUG: bool = False
 
     # 数据库配置
@@ -70,6 +70,43 @@ class Settings(BaseSettings):
     ASR_API_URL: str = ""
     ASR_API_KEY: str = ""
 
+    # ICP 上游接口（催记管理数据源；完整 URL，含 /v1/icp/ICP1100010 路径）
+    # 形如 http://escterminal:10306/v1/icp/ICP1100010
+    ICP_API_BASE_URL: str = ""
+    ICP_API_TIMEOUT: int = 15
+    ICP_API_TOKEN: str = ""
+
+    # —— 上游 CSP 适配器（MAC / verify / decrypt 的统一网关）——
+    # CSP_ADAPTER_BASE_URL：形如 http://csp-adapter:8081（不含 /v1/* 后缀）
+    CSP_ADAPTER_BASE_URL: str = ""
+    CSP_ADAPTER_TIMEOUT: int = 10
+
+    # —— 链路上行固定标识（不同环境可改）——
+    # X_CSP_GLOBAL_SERVICE_NO：同一逻辑请求（一次刷新）的所有 HTTP 调用共享
+    # X_CSP_SOURCE_JOURNAL_NO：同一逻辑请求共享；留空则每次刷新自动生成
+    #                         （DEMO{yyyyMMdd}{9 位毫秒序号}，与上游样例同形）
+    CSP_KEY_NAME: str = "GZYH.LMDA_node.zek"
+    X_CSP_GLOBAL_SERVICE_NO: str = "G202610130000000001"
+    X_CSP_SOURCE_JOURNAL_NO: str = ""
+    # 节点名：generate 调 ICPA 侧、verify 调 LMDA 侧（与上游样例一致）
+    X_CSP_NODE_NAME_GENERATE: str = "ICPA"
+    X_CSP_NODE_NAME_VERIFY: str = "LMDA"
+    # GZB 流向：我们是 LMD 侧，调用 ICP 侧（与上游样例一致）
+    X_GZB_SOURCE_SYSTEM_CODE: str = "LMD"
+    X_GZB_SINK_SYSTEM_CODE: str = "ICP"
+    X_GZB_ACTION_ID: str = "ICP1100010"
+    X_GZB_MAC_ENCRYPT_TYPE: int = 4
+
+    # —— 催记刷新窗口（[明天00:00 - N天, 明天00:00)；N=1 只覆盖今天，N=2 覆盖昨天+今天）——
+    RECORDING_REQUEST_DURATION_DAYS: int = 2
+
+    # 催记管理 - 后台处理并发度 & 启动恢复阈值
+    COLLECTION_NOTE_PROCESS_CONCURRENCY: int = 3
+    COLLECTION_NOTE_STUCK_MINUTES: int = 10
+
+    # 催记管理 - 刷新频控（同一 loginid 在此秒数内只允许一次刷新；<=0 表示关闭）
+    COLLECTION_NOTE_REFRESH_COOLDOWN_SECONDS: int = 5
+
     # 分页配置
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
@@ -123,8 +160,23 @@ class Settings(BaseSettings):
             missing.append("DB_PASSWORD_ENCRYPTED")
         if not self.ADMIN_PASSWORD:
             missing.append("ADMIN_PASSWORD")
+        # 上游 CSP / ICP 链路必填（催记刷新依赖）
+        for name, val in (
+            ("CSP_ADAPTER_BASE_URL", self.CSP_ADAPTER_BASE_URL),
+            ("ICP_API_BASE_URL", self.ICP_API_BASE_URL),
+        ):
+            if not val:
+                missing.append(name)
         if missing:
             raise ValueError(f"缺少必填配置: {', '.join(missing)}，请检查 .env 文件")
+
+        # 数值约束
+        if self.RECORDING_REQUEST_DURATION_DAYS < 1:
+            raise ValueError(
+                f"RECORDING_REQUEST_DURATION_DAYS 必须 ≥ 1，当前={self.RECORDING_REQUEST_DURATION_DAYS}"
+            )
+        if self.X_GZB_MAC_ENCRYPT_TYPE not in (1, 2, 3, 4):
+            raise ValueError("X_GZB_MAC_ENCRYPT_TYPE 必须是 1/2/3/4")
         return self
 
     class Config:

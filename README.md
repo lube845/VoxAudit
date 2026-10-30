@@ -104,14 +104,18 @@ docker-compose up -d --build
 # API文档: http://localhost:8000/docs
 ```
 
+> **改代码后一定要重新构建**：镜像 tag 由 `docker/.env` 里的 `IMAGE_TAG` 决定。
+> 改完代码请 bump 这个 tag（如 `IMAGE_TAG=20261023`），再执行
+> `docker-compose up -d --build`，否则会复用本地同名旧镜像，代码不生效却看不出来。
+
 ### 常用命令
 
 ```bash
 # 查看服务状态
 docker-compose -f docker/docker-compose.yml ps
 
-# 查看后端日志
-docker-compose -f docker/docker-compose.yml logs -f backend
+# 查看后端日志（服务名是 voxaudit_backend）
+docker-compose -f docker/docker-compose.yml logs -f voxaudit_backend
 
 # 重启服务
 docker-compose -f docker/docker-compose.yml restart

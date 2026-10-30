@@ -111,7 +111,7 @@
       </template>
     </el-dialog>
 
-    <div class="footer-note">VoxAudit · 自动化通话质检</div>
+    <div class="footer-note">自动化通话质检</div>
   </div>
 </template>
 
@@ -285,21 +285,18 @@ const handleBackToLoginFromDialog = () => {
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: var(--va-paper);
-  /* 编辑风发丝网格 */
-  background-image:
-    linear-gradient(var(--va-hairline) 1px, transparent 1px),
-    linear-gradient(90deg, var(--va-hairline) 1px, transparent 1px);
-  background-size: 56px 56px;
-  background-position: center;
+  background: url('/login_background.jpg') center center / cover no-repeat var(--va-paper);
   position: relative;
 }
 
+/* 暗色遮罩 + 中央柔光，保证登录卡片在不同背景下都可读 */
 .login-container::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse 70% 60% at 50% 45%, var(--va-paper) 30%, transparent 75%);
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 45%, transparent 30%, rgba(33, 29, 24, 0.55) 85%),
+    rgba(33, 29, 24, 0.25);
   pointer-events: none;
 }
 
@@ -363,8 +360,9 @@ const handleBackToLoginFromDialog = () => {
   position: relative;
   margin-top: 28px;
   font-size: 12px;
-  color: var(--va-muted);
+  color: rgba(255, 255, 255, 0.78);
   letter-spacing: 0.2em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 
 .password-toggle {

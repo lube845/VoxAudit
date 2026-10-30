@@ -243,7 +243,7 @@ async function confirmClearData(row) {
   try {
     ({ value: typed } = await ElMessageBox.prompt(
       `确认清除 ${row.loginid} 的全部业务数据？\n` +
-        '将删除该账号的所有录音、转写、评分结果、评分规则，以及 MinIO 上的录音文件。\n' +
+        '将删除该账号的所有录音、转写、评分结果、评分规则，催记管理中的通话记录与催记，以及 MinIO 上的录音文件。\n' +
         '此操作不可撤销。账号本身和密码保持不变。\n\n' +
         `请输入工号 ${row.loginid} 以继续：`,
       '清除数据',
@@ -281,6 +281,7 @@ async function confirmRemove(row) {
       `⚠️ 即将从白名单中剔除 ${row.loginid}。\n` +
         '此操作将：\n' +
         '  · 删除该账号的全部录音、转写、评分结果、评分规则\n' +
+        '  · 删除催记管理中的通话记录与催记\n' +
         '  · 删除 MinIO 上的录音文件\n' +
         '  · 删除白名单条目（账号将无法再登录，除非再次添加）\n\n' +
         '此操作不可撤销。\n\n' +

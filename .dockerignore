@@ -1,0 +1,36 @@
+# Docker 构建上下文排除项
+# 目的：避免把本地依赖/大文件发给构建器（node_modules、已导出的镜像 tar 等）
+
+.git
+.gitignore
+**/node_modules
+**/dist
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.venv
+**/venv
+
+# 已导出的离线镜像包（体积大，构建时不需要）
+docker/images
+
+# 本地日志/临时文件
+logs
+*.log
+tmp
+
+# 编辑器/系统文件
+.idea
+.vscode
+.DS_Store
+
+# 密钥文件：绝不能进构建上下文（远程 builder 会把它传到本机之外）
+# 运行时配置由 compose 的 env_file 注入，镜像里不需要
+docker/.env
+**/.env
+**/.env.*
+!docker/.env.example
+
+# 内部协议参考文档（仅供开发对照，不进镜像）
+录音请求.txt
+催记需求.txt

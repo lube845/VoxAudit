@@ -81,7 +81,7 @@
         </el-form-item>
       </el-form>
     </div>
-    <div class="footer-note">VoxAudit · 自动化通话质检</div>
+    <div class="footer-note">自动化通话质检</div>
   </div>
 </template>
 

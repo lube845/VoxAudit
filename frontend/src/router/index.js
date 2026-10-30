@@ -111,6 +111,8 @@ router.beforeEach((to, from, next) => {
   const loginid = userInfo?.loginid || ''
   // k 开头的普通账号只能访问催记管理
   const isKUser = loginid.startsWith('k') && loginid !== 'admin'
+  // oa 账户（既不是 admin 也不是 k 前缀）不能进催记管理
+  const isOaUser = !isKUser && loginid !== 'admin' && !!loginid
 
   // k 账号的密码是否需要强制修改：
   //   - password_expire_at 缺失/为 null → 仍在用默认密码
@@ -143,6 +145,9 @@ router.beforeEach((to, from, next) => {
     next('/collection-notes')
   } else if (to.meta.requiresAdmin && loginid !== 'admin') {
     next(isKUser ? '/collection-notes' : '/home')
+  } else if (isOaUser && (to.path === '/collection-notes' || to.path.startsWith('/collection-notes/'))) {
+    // oa 账户不允许进入催记管理（与后端 403 双重防护）
+    next('/home')
   } else {
     next()
   }

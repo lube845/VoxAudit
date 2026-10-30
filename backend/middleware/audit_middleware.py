@@ -44,6 +44,11 @@ FINE_RULES: list[tuple[str, re.Pattern, str, str | None, str | None]] = [
     ("POST",   re.compile(r"^/api/v1/recordings/batch-retry$"),                    "recording.batch_retry",    None, None),
 
     # —— 催记管理 ——
+    ("POST",   re.compile(r"^/api/v1/collection-notes/calls/refresh$"),                          "collection_note.refresh",          "collection_note", None),
+    ("POST",   re.compile(r"^/api/v1/collection-notes/calls/(?P<id>[^/]+)/process$"),           "collection_note.process",          "collection_note", "id"),
+    ("POST",   re.compile(r"^/api/v1/collection-notes/calls/(?P<id>[^/]+)/transcribe$"),        "collection_note.transcribe",       "collection_note", "id"),
+    ("POST",   re.compile(r"^/api/v1/collection-notes/calls/(?P<id>[^/]+)/note/structured$"),  "collection_note.note.structured",  "collection_note", "id"),
+    ("POST",   re.compile(r"^/api/v1/collection-notes/calls/(?P<id>[^/]+)/note/unstructured$"), "collection_note.note.unstructured", "collection_note", "id"),
     ("POST",   re.compile(r"^/api/v1/collection-notes/calls/(?P<id>[^/]+)/view-structured$"),   "collection_note.view_structured",   "collection_note", "id"),
     ("POST",   re.compile(r"^/api/v1/collection-notes/calls/(?P<id>[^/]+)/view-unstructured$"), "collection_note.view_unstructured", "collection_note", "id"),
     ("POST",   re.compile(r"^/api/v1/collection-notes/calls/(?P<id>[^/]+)/edit-structured$"),   "collection_note.edit_structured",   "collection_note", "id"),

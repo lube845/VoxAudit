@@ -191,6 +191,14 @@ export default {
   collectionNotes: {
     listCalls:        (params) => request.get('/collection-notes/calls', { params }),
     getCall:          (callId) => request.get(`/collection-notes/calls/${encodeURIComponent(callId)}`),
+    refreshCalls:     (data) => request.post('/collection-notes/calls/refresh', data),
+    refreshStatus:    (jobId) => request.get(`/collection-notes/calls/refresh/${encodeURIComponent(jobId)}`),
+    // 重新处理是后端同步跑的（ASR 最多几分钟，LLM 约 60s），超时放宽，
+    // 否则前端 30s 就报错、按钮一直转圈，后端其实还在跑
+    processCall:      (callId) => request.post(`/collection-notes/calls/${encodeURIComponent(callId)}/process`, null, { timeout: 300000 }),
+    retryTranscribe:  (callId) => request.post(`/collection-notes/calls/${encodeURIComponent(callId)}/transcribe`, null, { timeout: 300000 }),
+    retryStructured:  (callId) => request.post(`/collection-notes/calls/${encodeURIComponent(callId)}/note/structured`, null, { timeout: 300000 }),
+    retryUnstructured: (callId) => request.post(`/collection-notes/calls/${encodeURIComponent(callId)}/note/unstructured`, null, { timeout: 300000 }),
     viewStructured:   (callId) => request.post(`/collection-notes/calls/${encodeURIComponent(callId)}/view-structured`),
     viewUnstructured: (callId) => request.post(`/collection-notes/calls/${encodeURIComponent(callId)}/view-unstructured`),
     editStructured:   (callId, data) => request.post(`/collection-notes/calls/${encodeURIComponent(callId)}/edit-structured`, data),

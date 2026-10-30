@@ -64,6 +64,8 @@ class PromptConfig(BaseModel):
     rule_refine: Optional[PromptItem] = None
     bonus_judgment: Optional[PromptItem] = None
     deduction_judgment: Optional[PromptItem] = None
+    unstructured_note: Optional[PromptItem] = None
+    structured_note: Optional[PromptItem] = None
 
 
 async def get_setting(session: AsyncSessionLocal, key: str) -> Optional[str]:
@@ -201,7 +203,7 @@ async def test_llm_config(
                 {"role": "user", "content": "你好，请回复OK"},
             ],
             "temperature": 0.1,
-            "max_tokens": 10,
+            "max_tokens": 10000,
         }
 
         async with httpx.AsyncClient(timeout=30) as client:
@@ -295,6 +297,8 @@ async def get_prompts(current_user: dict = Depends(require_admin)):
             rule_refine=get_prompt_item("prompt_rule_refine", DEFAULT_PROMPTS["prompt_rule_refine"]),
             bonus_judgment=get_prompt_item("prompt_bonus_judgment", DEFAULT_PROMPTS["prompt_bonus_judgment"]),
             deduction_judgment=get_prompt_item("prompt_deduction_judgment", DEFAULT_PROMPTS["prompt_deduction_judgment"]),
+            unstructured_note=get_prompt_item("prompt_unstructured_note", DEFAULT_PROMPTS["prompt_unstructured_note"]),
+            structured_note=get_prompt_item("prompt_structured_note", DEFAULT_PROMPTS["prompt_structured_note"]),
         )
 
 
@@ -319,6 +323,12 @@ async def update_prompts(
         if config.deduction_judgment is not None:
             await set_setting(session, "prompt_deduction_judgment_system", config.deduction_judgment.system, "减分规则判定System Prompt")
             await set_setting(session, "prompt_deduction_judgment_user", config.deduction_judgment.user, "减分规则判定User Prompt")
+        if config.unstructured_note is not None:
+            await set_setting(session, "prompt_unstructured_note_system", config.unstructured_note.system, "非结构化催记生成System Prompt")
+            await set_setting(session, "prompt_unstructured_note_user", config.unstructured_note.user, "非结构化催记生成User Prompt")
+        if config.structured_note is not None:
+            await set_setting(session, "prompt_structured_note_system", config.structured_note.system, "结构化催记生成System Prompt")
+            await set_setting(session, "prompt_structured_note_user", config.structured_note.user, "结构化催记生成User Prompt")
 
         await session.commit()
         return {"message": "Prompt配置更新成功"}

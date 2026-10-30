@@ -30,7 +30,7 @@
           <el-icon><Mic /></el-icon>
           <template #title>录音管理</template>
         </el-menu-item>
-        <el-menu-item index="/collection-notes">
+        <el-menu-item v-if="!isOaUser" index="/collection-notes">
           <el-icon><NotebookText /></el-icon>
           <template #title>催记管理</template>
         </el-menu-item>
@@ -99,6 +99,12 @@ const isAdmin = computed(() => userInfo.value?.loginid === 'admin')
 const isKUser = computed(() => {
   const loginid = userInfo.value?.loginid || ''
   return loginid.startsWith('k') && !isAdmin.value
+})
+
+// oa 账户：非 admin 且非 k 前缀
+const isOaUser = computed(() => {
+  const loginid = userInfo.value?.loginid || ''
+  return !!loginid && !isAdmin.value && !isKUser.value
 })
 
 const pageTitles = {

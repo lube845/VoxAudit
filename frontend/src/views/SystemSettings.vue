@@ -284,6 +284,44 @@
                 />
               </div>
             </el-form-item>
+
+            <el-form-item label="非结构化催记生成">
+              <div class="prompt-section">
+                <div class="prompt-label">System Prompt</div>
+                <el-input
+                  v-model="promptForm.unstructured_note.system"
+                  type="textarea"
+                  :rows="10"
+                  placeholder="系统角色设定、催记要素与写作要求"
+                />
+                <div class="prompt-label" style="margin-top: 12px;">User Prompt</div>
+                <el-input
+                  v-model="promptForm.unstructured_note.user"
+                  type="textarea"
+                  :rows="4"
+                  placeholder="用户输入模板，变量：{transcript}"
+                />
+              </div>
+            </el-form-item>
+
+            <el-form-item label="结构化催记生成">
+              <div class="prompt-section">
+                <div class="prompt-label">System Prompt</div>
+                <el-input
+                  v-model="promptForm.structured_note.system"
+                  type="textarea"
+                  :rows="10"
+                  placeholder="系统角色设定、催记分段标签与写作要求"
+                />
+                <div class="prompt-label" style="margin-top: 12px;">User Prompt</div>
+                <el-input
+                  v-model="promptForm.structured_note.user"
+                  type="textarea"
+                  :rows="4"
+                  placeholder="用户输入模板，变量：{transcript}"
+                />
+              </div>
+            </el-form-item>
           </el-form>
         </el-card>
       </el-tab-pane>
@@ -498,6 +536,67 @@ const DEFAULT_PROMPTS = {
 
 ## 减分规则
 {rules_json}`
+  },
+  unstructured_note: {
+    system: `你是一名资深的金融催收记录员，任务是根据本通催收电话的转写内容，生成一份"非结构化催记"。
+
+## 目标
+非结构化催记是一段连贯的叙事性文字，按时间顺序或事件顺序描述本次通话的核心事实，供坐席本人或同事快速回溯通话内容、定位客户状态、准备后续跟进。
+
+## 内容要素（按需覆盖，不强求全有）
+1. **通话元信息**：外呼/接入时间（从转写里推算或标注"通话开始时间"）、座席工号或姓名、客户称呼或脱敏标识（如"尾号5678客户"）
+2. **开场身份核验**：坐席是否已表明身份与工号、客户是否本人接听、若非本人则转接/代接情况
+3. **欠款告知**：涉及的卡号/产品（脱敏）、逾期金额、逾期天数、应还款日
+4. **客户反馈与诉求**：客户对欠款的解释、情绪（为难/抵触/配合/失联）、提出的请求（缓期/分期/减免/再次确认金额）
+5. **坐席协商与施压**：坐席提供的方案（还款日/分期/最低还款）、强调的法律或征信后果
+6. **承诺与共识**：客户最终是否承诺还款、承诺金额与时间、是否需要书面确认
+7. **后续动作**：本次约定好的还款日期、复访/复电安排、是否升级处理
+8. **特殊情况**：通话中断、信号差、客户挂断、明确表示拒绝沟通、紧急联系人提及等
+
+## 写作要求
+- **事实为主**：所有信息必须能在转写中找到对应原话或可合理推断，不编造金额、姓名、日期
+- **客观中立**：用第三人称或客观陈述，避免"态度恶劣""敷衍了事"等主观评价；如需引用客户原话可直接引用并加引号
+- **脱敏优先**：手机号、卡号、身份证号等敏感字段一律脱敏（手机号写"尾号XXXX"）
+- **篇幅**：通常 150-300 字；信息少时不少于 80 字，信息多时不超过 500 字
+- **格式**：纯文本连续段落；不需要标题、不需要项目符号
+- **语言**：与转写保持一致（中文通话用中文）
+
+## 输出
+只输出催记正文，不要加任何标题、前缀、Markdown 标记或解释。`,
+    user: `## 通话转写原文
+{transcript}
+
+请基于以上转写生成非结构化催记。`
+  },
+  structured_note: {
+    system: `你是一名资深的金融催收记录员，任务是根据本通催收电话的转写内容，生成一份"结构化催记"。
+
+## 目标
+结构化催记是按固定标签分段、便于检索与统计的催记形式。质检、复盘、报表都基于此结构。
+
+## 必须使用的分段标签（顺序固定，跳过无内容的标签即可）
+【客户身份】是否本人接听、是否转接/代接、客户姓名（脱敏）或尾号
+【欠款情况】涉及产品/卡号（脱敏）、欠款金额、逾期天数、应还款日
+【客户反馈】客户对欠款的解释、当前资金状况、情绪反应、提出的诉求（缓期/分期/减免等）
+【协商与施压】坐席提供的方案、强调的法律/征信后果、是否给出宽限期
+【承诺情况】客户最终是否承诺还款、承诺金额、承诺还款日期；如未承诺则填"无"
+【后续跟进】本次约定的复访/复电日期、跟进重点、是否升级处理
+【特殊情况】通话中断、信号差、客户明确拒绝沟通、紧急联系人等（如无填"无"）
+
+## 写作要求
+- 严格使用上述【】标签，每个标签独占一行；不新增标签、不合并标签
+- 标签内只写事实，能在转写里找到原话或可合理推断；不编造金额、姓名、日期
+- 手机号、卡号、身份证号等敏感字段一律脱敏
+- 每个标签内容简洁，1-3 句话，避免长段落；如信息过少可一句话概括
+- 如果某一标签在本次通话中无相关信息，写"无"或"未提及"，不要为了填充而虚构
+- 整体输出不超过 400 字
+
+## 输出
+只输出结构化催记正文（标签 + 内容），不要加任何标题、前缀、Markdown 代码块或额外解释。`,
+    user: `## 通话转写原文
+{transcript}
+
+请基于以上转写生成结构化催记。`
   }
 }
 
@@ -506,6 +605,8 @@ const promptForm = ref({
   rule_refine: { system: DEFAULT_PROMPTS.rule_refine.system, user: DEFAULT_PROMPTS.rule_refine.user },
   bonus_judgment: { system: DEFAULT_PROMPTS.bonus_judgment.system, user: DEFAULT_PROMPTS.bonus_judgment.user },
   deduction_judgment: { system: DEFAULT_PROMPTS.deduction_judgment.system, user: DEFAULT_PROMPTS.deduction_judgment.user },
+  unstructured_note: { system: DEFAULT_PROMPTS.unstructured_note.system, user: DEFAULT_PROMPTS.unstructured_note.user },
+  structured_note: { system: DEFAULT_PROMPTS.structured_note.system, user: DEFAULT_PROMPTS.structured_note.user },
 })
 
 const promptFormDefault = ref({
@@ -513,6 +614,8 @@ const promptFormDefault = ref({
   rule_refine: { system: DEFAULT_PROMPTS.rule_refine.system, user: DEFAULT_PROMPTS.rule_refine.user },
   bonus_judgment: { system: DEFAULT_PROMPTS.bonus_judgment.system, user: DEFAULT_PROMPTS.bonus_judgment.user },
   deduction_judgment: { system: DEFAULT_PROMPTS.deduction_judgment.system, user: DEFAULT_PROMPTS.deduction_judgment.user },
+  unstructured_note: { system: DEFAULT_PROMPTS.unstructured_note.system, user: DEFAULT_PROMPTS.unstructured_note.user },
+  structured_note: { system: DEFAULT_PROMPTS.structured_note.system, user: DEFAULT_PROMPTS.structured_note.user },
 })
 
 const currentLlmConfig = ref({})
@@ -541,7 +644,11 @@ const hasPromptChanges = computed(() => {
     promptForm.value.bonus_judgment?.system !== promptFormDefault.value.bonus_judgment?.system ||
     promptForm.value.bonus_judgment?.user !== promptFormDefault.value.bonus_judgment?.user ||
     promptForm.value.deduction_judgment?.system !== promptFormDefault.value.deduction_judgment?.system ||
-    promptForm.value.deduction_judgment?.user !== promptFormDefault.value.deduction_judgment?.user
+    promptForm.value.deduction_judgment?.user !== promptFormDefault.value.deduction_judgment?.user ||
+    promptForm.value.unstructured_note?.system !== promptFormDefault.value.unstructured_note?.system ||
+    promptForm.value.unstructured_note?.user !== promptFormDefault.value.unstructured_note?.user ||
+    promptForm.value.structured_note?.system !== promptFormDefault.value.structured_note?.system ||
+    promptForm.value.structured_note?.user !== promptFormDefault.value.structured_note?.user
 })
 
 const canSaveLlm = computed(() => {
@@ -592,6 +699,14 @@ async function loadConfig() {
       deduction_judgment: {
         system: promptsData.deduction_judgment?.system || DEFAULT_PROMPTS.deduction_judgment.system,
         user: promptsData.deduction_judgment?.user || DEFAULT_PROMPTS.deduction_judgment.user,
+      },
+      unstructured_note: {
+        system: promptsData.unstructured_note?.system || DEFAULT_PROMPTS.unstructured_note.system,
+        user: promptsData.unstructured_note?.user || DEFAULT_PROMPTS.unstructured_note.user,
+      },
+      structured_note: {
+        system: promptsData.structured_note?.system || DEFAULT_PROMPTS.structured_note.system,
+        user: promptsData.structured_note?.user || DEFAULT_PROMPTS.structured_note.user,
       },
     }
     promptFormDefault.value = JSON.parse(JSON.stringify(promptForm.value))
@@ -708,6 +823,8 @@ async function handleSavePrompts() {
       rule_refine: promptForm.value.rule_refine,
       bonus_judgment: promptForm.value.bonus_judgment,
       deduction_judgment: promptForm.value.deduction_judgment,
+      unstructured_note: promptForm.value.unstructured_note,
+      structured_note: promptForm.value.structured_note,
     })
     promptFormDefault.value = JSON.parse(JSON.stringify(promptForm.value))
     ElMessage.success('Prompt配置保存成功')

@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.exceptions import RequestValidationError
 from contextlib import asynccontextmanager
+import asyncio
 import time
 import os
 from loguru import logger
@@ -20,11 +21,19 @@ from backend.api import rule_router, history_router, recording_router, statistic
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("正在启动应用...")
-    try:
-        await init_db()
-        logger.info("数据库初始化完成")
-    except Exception as e:
-        logger.error(f"数据库初始化失败: {e}")
+    # 数据库初始化：失败必须让服务起不来（fail fast）。
+    # 半迁移状态上线会导致「启动日志里有错、接口全 500」这种最难查的问题。
+    # MySQL 可能刚起来还没完全就绪，所以重试几次再放弃。
+    for attempt in range(1, 6):
+        try:
+            await init_db()
+            logger.info("数据库初始化完成")
+            break
+        except Exception as e:
+            logger.error(f"数据库初始化失败（第 {attempt}/5 次）: {e!r}")
+            if attempt >= 5:
+                raise
+            await asyncio.sleep(3)
 
     # 初始化MinIO存储桶
     try:
@@ -32,6 +41,15 @@ async def lifespan(app: FastAPI):
         logger.info("MinIO存储桶初始化完成")
     except Exception as e:
         logger.warning(f"MinIO存储桶初始化失败（桶可能已存在）: {e}")
+
+    # 催记：启动后台处理循环
+    # init_db 里已经把上次进程崩溃遗留的 processing 记录重置回 pending，
+    # 这里必须把循环拉起来接手，否则那些行会一直停在 pending（前端一直转圈）
+    try:
+        from backend.services.collection_note_service import collection_note_service
+        await collection_note_service.trigger_background_processing()
+    except Exception as e:
+        logger.warning(f"催记后台处理循环启动失败: {e!r}")
 
     yield
     logger.info("正在关闭应用...")

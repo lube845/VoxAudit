@@ -13,6 +13,10 @@ from . import (
     migrate_rule_ids_to_json,
     migrate_add_k_user_name_department,
     migrate_add_audit_logs,
+    migrate_add_call_records,
+    migrate_add_call_notes,
+    migrate_add_call_record_url_inner,
+    migrate_add_call_record_calling_number,
 )
 
 # 顺序：先列变更，后数据迁移
@@ -28,4 +32,8 @@ ALL_MIGRATIONS = (
     migrate_rule_ids_to_json,
     migrate_add_k_user_name_department,
     migrate_add_audit_logs,
+    migrate_add_call_records,
+    migrate_add_call_notes,
+    migrate_add_call_record_url_inner,
+    migrate_add_call_record_calling_number,
 )

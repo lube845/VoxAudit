@@ -15,12 +15,29 @@ from backend.core.config import settings
 from backend.core.database import get_db
 from backend.core.datetime_utils import get_current_time
 from backend.models.k_user import KUser
+from backend.models.call_note import CallNote
+from backend.models.call_record import CallRecord
 from backend.models.recording import Recording, TranscriptSegment, ScoringResult
 from backend.models.rule import ScoringRule
 from backend.services.oss_service import oss_service
 from backend.api.auth import hash_password, _k_login_state, get_current_user_required
 
 router = APIRouter(prefix="/admin/k-users", tags=["客服账号管理"])
+
+
+def _agent_id_variants(loginid: str) -> set[str]:
+    """k 账号在催记表里的座席标识形态：{"k+工号", "工号"}。
+
+    催记管理的 agent_id 口径与 collection_note.py 保持一致（查询侧兼容历史纯工号形态）。
+    """
+    s = (loginid or "").strip()
+    if not s:
+        return set()
+    variants = {s if s[0] == "k" else "k" + s}
+    plain = s[1:] if s[0].lower() == "k" else s
+    if plain:
+        variants.add(plain)
+    return variants
 
 
 def _require_admin(user_info: dict) -> None:
@@ -200,7 +217,9 @@ async def _purge_k_user_business_data(
     db: AsyncSession, loginid: str
 ) -> dict:
     """清空 k 账号的全部业务数据（不 commit；返回删除条数与待清理的 OSS 对象键列表）。
-    删除顺序：transcript_segments / scoring_results（子表）→ scoring_rules / recordings（主表）。
+    删除顺序：
+      ① transcript_segments / scoring_results（子表）→ scoring_rules / recordings（主表）
+      ② call_notes（子表）→ call_records（主表）——催记管理
     """
     rec_rows = (
         await db.execute(
@@ -233,11 +252,40 @@ async def _purge_k_user_business_data(
     )
     recordings_deleted = rec_res.rowcount or 0
 
+    # —— 催记管理：call_notes 依赖 call_records.call_id，先删子表再删主表 ——
+    agent_ids = _agent_id_variants(loginid)
+    call_ids = []
+    if agent_ids:
+        call_ids = list(
+            (
+                await db.execute(
+                    select(CallRecord.call_id).where(CallRecord.agent_id.in_(agent_ids))
+                )
+            ).all()
+        )
+        call_ids = [r[0] for r in call_ids if r[0]]
+
+    call_notes_deleted = 0
+    if call_ids:
+        cn_res = await db.execute(
+            delete(CallNote).where(CallNote.call_id.in_(call_ids))
+        )
+        call_notes_deleted = cn_res.rowcount or 0
+
+    call_records_deleted = 0
+    if agent_ids:
+        cr_res = await db.execute(
+            delete(CallRecord).where(CallRecord.agent_id.in_(agent_ids))
+        )
+        call_records_deleted = cr_res.rowcount or 0
+
     return {
         "recordings_deleted": recordings_deleted,
         "rules_deleted": rules_deleted,
         "transcripts_deleted": transcript_deleted,
         "scoring_results_deleted": scoring_results_deleted,
+        "call_records_deleted": call_records_deleted,
+        "call_notes_deleted": call_notes_deleted,
         "object_keys": object_keys,
     }
 
@@ -264,6 +312,7 @@ async def clear_k_user_data(
     """清除指定 k 账号的全部业务数据（admin，密码不变）：
     - recordings（含 transcript_segments / scoring_results 子表）
     - scoring_rules
+    - 催记管理：call_records + call_notes
     - MinIO 上的录音文件
     账号本身（k_users 行）保留，密码、姓名、部门不动。
     """
@@ -288,12 +337,15 @@ async def clear_k_user_data(
         f"recordings={counts['recordings_deleted']}, rules={counts['rules_deleted']}, "
         f"transcripts={counts['transcripts_deleted']}, "
         f"scoring_results={counts['scoring_results_deleted']}, "
+        f"call_records={counts['call_records_deleted']}, "
+        f"call_notes={counts['call_notes_deleted']}, "
         f"files_deleted={files_deleted}, files_failed={files_failed}"
     )
 
     msg = (
         f"已清除 {loginid} 的数据：{counts['recordings_deleted']} 条录音、"
-        f"{counts['rules_deleted']} 条评分规则、{files_deleted} 个文件"
+        f"{counts['rules_deleted']} 条评分规则、"
+        f"{counts['call_records_deleted']} 条催记通话记录、{files_deleted} 个文件"
     )
     if files_failed:
         msg += f"，{files_failed} 个文件删除失败"
@@ -305,6 +357,8 @@ async def clear_k_user_data(
         "rules_deleted": counts["rules_deleted"],
         "transcripts_deleted": counts["transcripts_deleted"],
         "scoring_results_deleted": counts["scoring_results_deleted"],
+        "call_records_deleted": counts["call_records_deleted"],
+        "call_notes_deleted": counts["call_notes_deleted"],
         "files_deleted": files_deleted,
         "files_failed": files_failed,
         # 账号行仍然存在，密码不变
@@ -349,12 +403,15 @@ async def remove_k_user(
         f"recordings={counts['recordings_deleted']}, rules={counts['rules_deleted']}, "
         f"transcripts={counts['transcripts_deleted']}, "
         f"scoring_results={counts['scoring_results_deleted']}, "
+        f"call_records={counts['call_records_deleted']}, "
+        f"call_notes={counts['call_notes_deleted']}, "
         f"files_deleted={files_deleted}, files_failed={files_failed}"
     )
 
     msg = (
         f"已剔除 {loginid}：清除 {counts['recordings_deleted']} 条录音、"
-        f"{counts['rules_deleted']} 条评分规则、{files_deleted} 个文件，账号不再能登录"
+        f"{counts['rules_deleted']} 条评分规则、"
+        f"{counts['call_records_deleted']} 条催记通话记录、{files_deleted} 个文件，账号不再能登录"
     )
     if files_failed:
         msg += f"，{files_failed} 个文件删除失败"
@@ -366,6 +423,8 @@ async def remove_k_user(
         "rules_deleted": counts["rules_deleted"],
         "transcripts_deleted": counts["transcripts_deleted"],
         "scoring_results_deleted": counts["scoring_results_deleted"],
+        "call_records_deleted": counts["call_records_deleted"],
+        "call_notes_deleted": counts["call_notes_deleted"],
         "files_deleted": files_deleted,
         "files_failed": files_failed,
         "removed_loginid": loginid,

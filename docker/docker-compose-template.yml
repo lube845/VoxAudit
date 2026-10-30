@@ -9,6 +9,7 @@ services:
       MYSQL_DATABASE: ${DB_NAME:-voxaudit_db}
     volumes:
       - mysql_data:/var/lib/mysql
+      - /etc/hosts:/etc/hosts:ro
     ports:
       - "${DB_EXTERNAL_PORT:-3307}:3306"
     networks:
@@ -20,11 +21,15 @@ services:
       retries: 5
     command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
 
-  # 后端API服务
-  backend:
+  # 后端API服务 (代码已打入镜像, 不再挂载外部目录)
+  # 服务名必须是 voxaudit_backend：前端 docker/nginx.conf 里的 upstream 写死的就是这个名字，
+  # 改名会导致前端所有 /api/ 请求 502（host not found in upstream）
+  voxaudit_backend:
     build:
       context: ..
       dockerfile: docker/Dockerfile.backend
+    # 改代码后：bump .env 里的 IMAGE_TAG，再 docker compose up -d --build
+    image: voxaudit_backend:${IMAGE_TAG:-latest}
     env_file:
       - .env
     working_dir: /workspace
@@ -38,14 +43,15 @@ services:
     networks:
       - voxaudit_network
     volumes:
-      - ..:/workspace
-    command: sh -c "python -c 'import asyncio; from backend.core.database import init_db; from backend.core.seed import seed_data; asyncio.run(init_db()); asyncio.run(seed_data())' && python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000"
+      - /etc/hosts:/etc/hosts:ro
+    command: sh -c "python -c 'import asyncio; import backend.main; from backend.core.database import init_db; from backend.core.seed import seed_data; asyncio.run(init_db()); asyncio.run(seed_data())' && python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000"
 
   # MinIO对象存储
   minio:
     image: minio/minio:latest
     volumes:
       - minio_data:/data
+      - /etc/hosts:/etc/hosts:ro
     ports:
       - "${MINIO_API_PORT:-9000}:9000"
       - "${MINIO_CONSOLE_PORT:-9001}:9001"
@@ -59,16 +65,20 @@ services:
       retries: 3
 
   # 前端服务 (生产模式)
-  frontend:
+  # 服务名必须是 voxaudit_frontend（与上面的 voxaudit_backend 对应）
+  voxaudit_frontend:
     build:
       context: ..
       dockerfile: docker/Dockerfile.frontend
+    image: voxaudit_frontend:${IMAGE_TAG:-latest}
     ports:
       - "${FRONTEND_EXTERNAL_PORT:-8888}:80"
     networks:
       - voxaudit_network
+    volumes:
+      - /etc/hosts:/etc/hosts:ro
     depends_on:
-      - backend
+      - voxaudit_backend
 
 volumes:
   mysql_data:
